@@ -54,7 +54,7 @@ export function PriceTrendChart({
           <YAxis
             width={60}
             tick={{ fontSize: 11, fill: "var(--viz-text-muted)" }}
-            tickFormatter={(value: number) => `$${Math.round(value).toLocaleString("es-AR")}`}
+            tickFormatter={(value: number) => `Q ${Math.round(value).toLocaleString("es-GT")}`}
             stroke="var(--viz-axis)"
             tickLine={false}
             axisLine={false}

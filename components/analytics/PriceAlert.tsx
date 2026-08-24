@@ -1,3 +1,4 @@
+import { FiMinus, FiTrendingDown, FiTrendingUp } from "react-icons/fi";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { CambioPrecio } from "@/lib/analytics";
 
@@ -21,7 +22,7 @@ export function PriceAlert({ cambio }: { cambio: CambioPrecio }) {
   if (cambio.estado === "sube") {
     return (
       <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950/40">
-        <span className="text-lg leading-none">📈</span>
+        <FiTrendingUp className="h-5 w-5 shrink-0 text-red-600 dark:text-red-400" aria-hidden />
         <p className="text-sm text-red-800 dark:text-red-300">
           <span className="font-semibold">Subió {deltaAbs}%</span> por unidad desde tu compra
           anterior: {formatCurrency(cambio.anterior)} en {cambio.tiendaAnterior} (
@@ -35,7 +36,10 @@ export function PriceAlert({ cambio }: { cambio: CambioPrecio }) {
   if (cambio.estado === "baja") {
     return (
       <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900 dark:bg-emerald-950/40">
-        <span className="text-lg leading-none">📉</span>
+        <FiTrendingDown
+          className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400"
+          aria-hidden
+        />
         <p className="text-sm text-emerald-800 dark:text-emerald-300">
           <span className="font-semibold">Bajó {deltaAbs}%</span> por unidad desde tu compra
           anterior ({formatCurrency(cambio.anterior)} → {formatCurrency(cambio.actual)}).
@@ -46,7 +50,7 @@ export function PriceAlert({ cambio }: { cambio: CambioPrecio }) {
 
   return (
     <div className="flex items-start gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900">
-      <span className="text-lg leading-none">➖</span>
+      <FiMinus className="h-5 w-5 shrink-0 text-zinc-500 dark:text-zinc-400" aria-hidden />
       <p className="text-sm text-zinc-600 dark:text-zinc-300">
         Mismo precio por unidad que tu compra anterior ({formatCurrency(cambio.actual)}).
       </p>

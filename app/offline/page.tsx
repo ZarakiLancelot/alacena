@@ -1,3 +1,5 @@
+import { FiWifiOff } from "react-icons/fi";
+
 // Fallback offline básico (requisito 3). El service worker (app/sw.ts) sirve esta
 // página cuando una navegación falla por falta de red y no hay nada cacheado para
 // esa URL. Se precachea explícitamente en app/serwist/[path]/route.ts porque, al no
@@ -5,7 +7,7 @@
 export default function OfflinePage() {
   return (
     <div className="mx-auto flex min-h-full max-w-sm flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-      <span className="text-4xl">📡</span>
+      <FiWifiOff className="h-10 w-10 text-zinc-400" aria-hidden />
       <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
         Sin conexión
       </h1>

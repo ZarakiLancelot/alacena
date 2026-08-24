@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { FiBell, FiBellOff, FiShare2, FiSmartphone } from "react-icons/fi";
 import { isIOS, isPushSupported, isRunningStandalone, urlBase64ToUint8Array } from "@/lib/push/client";
 
 type Status =
@@ -119,14 +120,16 @@ export function PushToggle() {
   if (status === "ios-needs-install") {
     return (
       <Card>
-        <p className="font-medium text-zinc-900 dark:text-zinc-50">
-          📲 Instalá la app para recibir notificaciones
+        <p className="flex items-center gap-2 font-medium text-zinc-900 dark:text-zinc-50">
+          <FiSmartphone className="h-5 w-5 shrink-0" aria-hidden />
+          Instalá la app para recibir notificaciones
         </p>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
           En iPhone/iPad, Safari solo permite notificaciones push si la app está
           agregada a la pantalla de inicio. Tocá el botón de compartir (
-          <span aria-hidden>􀈂</span>) y elegí <strong>&quot;Añadir a Inicio&quot;</strong>,
-          después abrí Alacena desde ese ícono y volvé a esta pantalla.
+          <FiShare2 className="inline h-3.5 w-3.5 align-[-2px]" aria-hidden />) y elegí{" "}
+          <strong>&quot;Añadir a Inicio&quot;</strong>, después abrí Alacena desde ese
+          ícono y volvé a esta pantalla.
         </p>
       </Card>
     );
@@ -146,8 +149,9 @@ export function PushToggle() {
   if (status === "denied") {
     return (
       <Card>
-        <p className="font-medium text-zinc-900 dark:text-zinc-50">
-          🔕 Notificaciones bloqueadas
+        <p className="flex items-center gap-2 font-medium text-zinc-900 dark:text-zinc-50">
+          <FiBellOff className="h-5 w-5 shrink-0" aria-hidden />
+          Notificaciones bloqueadas
         </p>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
           Bloqueaste los permisos de notificaciones para este sitio. Habilitalos
@@ -161,8 +165,9 @@ export function PushToggle() {
     <Card>
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="font-medium text-zinc-900 dark:text-zinc-50">
-            🔔 Notificaciones push
+          <p className="flex items-center gap-2 font-medium text-zinc-900 dark:text-zinc-50">
+            <FiBell className="h-5 w-5 shrink-0" aria-hidden />
+            Notificaciones push
           </p>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
             {status === "subscribed"

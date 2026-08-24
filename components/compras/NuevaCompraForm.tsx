@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { FiCheckCircle } from "react-icons/fi";
 import { Combobox } from "@/components/compras/Combobox";
 import { PresentacionField, type Presentacion } from "@/components/compras/PresentacionField";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -214,8 +215,9 @@ export function NuevaCompraForm({
         </p>
       ) : null}
       {state.success ? (
-        <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-          Compra registrada ✅
+        <p className="flex items-center gap-2 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+          <FiCheckCircle className="h-4 w-4 shrink-0" aria-hidden />
+          Compra registrada
         </p>
       ) : null}
 

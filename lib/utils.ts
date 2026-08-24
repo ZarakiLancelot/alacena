@@ -2,9 +2,9 @@ export function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-const currencyFormatter = new Intl.NumberFormat("es-AR", {
+const currencyFormatter = new Intl.NumberFormat("es-GT", {
   style: "currency",
-  currency: "ARS",
+  currency: "GTQ",
   maximumFractionDigits: 2,
 });
 

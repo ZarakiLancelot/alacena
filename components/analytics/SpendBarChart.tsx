@@ -27,7 +27,7 @@ export function SpendBarChart({
           <CartesianGrid stroke="var(--viz-grid)" horizontal={false} />
           <XAxis
             type="number"
-            tickFormatter={(value: number) => `$${Math.round(value).toLocaleString("es-AR")}`}
+            tickFormatter={(value: number) => `Q ${Math.round(value).toLocaleString("es-GT")}`}
             tick={{ fontSize: 11, fill: "var(--viz-text-muted)" }}
             stroke="var(--viz-axis)"
             tickLine={false}

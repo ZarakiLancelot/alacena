@@ -2,15 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { FiBarChart2, FiPackage, FiSettings, FiShoppingCart, FiTrendingUp } from "react-icons/fi";
+import type { IconType } from "react-icons";
 import { cn } from "@/lib/utils";
 
-const LINKS = [
-  { href: "/inventario", label: "Inventario", icon: "📦" },
-  { href: "/compras", label: "Nueva compra", icon: "🧾" },
-  { href: "/historial", label: "Historial", icon: "📊" },
-  { href: "/analytics", label: "Analytics", icon: "📈" },
-  { href: "/ajustes", label: "Ajustes", icon: "⚙️" },
-] as const;
+const LINKS: { href: string; label: string; Icon: IconType }[] = [
+  { href: "/inventario", label: "Inventario", Icon: FiPackage },
+  { href: "/compras", label: "Nueva compra", Icon: FiShoppingCart },
+  { href: "/historial", label: "Historial", Icon: FiBarChart2 },
+  { href: "/analytics", label: "Analytics", Icon: FiTrendingUp },
+  { href: "/ajustes", label: "Ajustes", Icon: FiSettings },
+];
 
 export function NavBar() {
   const pathname = usePathname();
@@ -21,12 +23,12 @@ export function NavBar() {
         dark:border-zinc-800 dark:bg-zinc-950/95"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      {LINKS.map((link) => {
-        const active = pathname.startsWith(link.href);
+      {LINKS.map(({ href, label, Icon }) => {
+        const active = pathname.startsWith(href);
         return (
           <Link
-            key={link.href}
-            href={link.href}
+            key={href}
+            href={href}
             className={cn(
               "flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs font-medium",
               active
@@ -34,8 +36,8 @@ export function NavBar() {
                 : "text-zinc-500 dark:text-zinc-400"
             )}
           >
-            <span className="text-xl leading-none">{link.icon}</span>
-            {link.label}
+            <Icon className="h-5 w-5" aria-hidden />
+            {label}
           </Link>
         );
       })}

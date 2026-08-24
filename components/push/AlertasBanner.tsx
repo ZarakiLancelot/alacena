@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FiClock } from "react-icons/fi";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -35,7 +36,7 @@ export async function AlertasBanner() {
       className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-sm
         text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200"
     >
-      <span aria-hidden>⏰</span>
+      <FiClock className="h-4 w-4 shrink-0" aria-hidden />
       <span className="min-w-0 flex-1 truncate">{mensaje}</span>
       <span className="shrink-0 font-medium underline underline-offset-2">Ver</span>
     </Link>
