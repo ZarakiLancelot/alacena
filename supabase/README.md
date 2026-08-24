@@ -15,6 +15,7 @@ erDiagram
     auth_users ||--o{ alertas_config : "user_id (dueño, único)"
     auth_users ||--o{ hogares : "created_by (opcional)"
     auth_users ||--o{ hogar_miembros : user_id
+    auth_users ||--|| profiles : "id (1:1, on delete cascade)"
 
     hogares ||--o{ hogar_miembros : hogar_id
     hogares ||--o{ compras : "hogar_id (permisos)"
@@ -26,6 +27,13 @@ erDiagram
 
     auth_users {
         uuid id PK
+    }
+    profiles {
+        uuid id PK_FK
+        text nombre_completo
+        text avatar_url
+        timestamptz created_at
+        timestamptz updated_at
     }
     hogares {
         uuid id PK
@@ -96,6 +104,8 @@ privado de un usuario puntual):
 ```
 auth.users
    │
+   ├── 🔒 profiles            (1:1, auto-creado al registrarse — visible además
+   │                           a quien comparta un hogar con vos, ver más abajo)
    ├── 🌐 tiendas             (compartida; created_by = autor)
    ├── 🌐 productos           (compartida; created_by = autor)
    │        └── 🌐 presentaciones (tamaño+unidad de un producto)
@@ -133,6 +143,14 @@ auth.users
   trigger `crear_membresia_owner` lo deja como `owner` automáticamente) o se
   une a uno existente con `unirse_a_hogar(codigo)`. Ver la sección "Hogares
   (soporte multi-usuario)" más abajo.
+- **`profiles` → 1:1 con cada usuario, pero visible más allá de "el propio"**:
+  cualquiera que comparta un hogar con vos puede leer tu `nombre_completo`/
+  `avatar_url` (no solo vos). Es la excepción deliberada al patrón "privado =
+  solo yo": el objetivo explícito de la tabla es que `/ajustes/hogar` pueda
+  mostrar nombres reales de los demás integrantes en vez de
+  `Miembro {uuid corto}`. Sigue sin ser pública: alguien que no comparte
+  ningún hogar con vos no puede leer tu profile. Editar (`UPDATE`) sigue
+  siendo estrictamente "solo el propio". Ver la sección "Profiles" más abajo.
 
 ## Migraciones
 
@@ -175,6 +193,14 @@ En `supabase/migrations/`, en orden de aplicación:
     `compras`/`alertas_config` por "cualquier miembro del hogar"; recrea las
     tres vistas de la migración 6 para que compilen contra `created_by` y
     reflejen el nuevo alcance.
+13. `20260823170000_profiles.sql` — tabla `profiles` (1:1 con `auth.users`,
+    `on delete cascade`); trigger genérico `set_updated_at` (mantiene
+    `updated_at`); trigger `on_auth_user_created_crear_profile` **en
+    `auth.users`** (alta automática al registrarse); función
+    `comparte_hogar_con(uuid)`; RLS y grants.
+14. `20260823170100_backfill_profiles.sql` — migración de datos: crea un
+    `profile` para cada usuario existente sin uno (el trigger de la
+    migración 13 solo dispara para altas nuevas). Idempotente.
 
 ### Nota sobre GRANTs (importante en este proyecto)
 
@@ -185,7 +211,8 @@ explícito además de las policies (`auto_expose_new_tables` ya no aplica). Por
 eso cada migración incluye, además de las policies, los `GRANT ... TO
 authenticated` correspondientes. El rol `anon` no recibe ningún grant: la app
 requiere sesión iniciada para leer o escribir cualquier tabla. Verificado
-localmente: `anon` obtiene `permission denied` en las 5 tablas.
+localmente en cada tanda de migraciones: `anon` obtiene `permission denied`
+en todas las tablas de `public`, `profiles` incluida.
 
 ## RLS aplicado (resumen)
 
@@ -198,6 +225,7 @@ localmente: `anon` obtiene `permission denied` en las 5 tablas.
 | `hogar_miembros` | miembro del hogar | — (solo vía trigger/RPC, ver abajo) | — (sin policy) | uno mismo, o `owner` de cualquiera |
 | `compras` | cualquier miembro del `hogar_id` | miembro del hogar, `created_by = auth.uid()` | cualquier miembro del hogar | cualquier miembro del hogar |
 | `alertas_config` | cualquier miembro del `hogar_id` | miembro del hogar, `user_id = auth.uid()` | cualquier miembro del hogar | cualquier miembro del hogar |
+| `profiles` | uno mismo, o quien comparta un hogar con vos (ver nota²) | — (solo vía trigger, ver abajo) | solo uno mismo | — (sin policy, se borra por `on delete cascade`) |
 | `push_subscriptions` | solo dueño | dueño | dueño | dueño |
 
 `user_id`/`created_by` (según la tabla) tienen `default auth.uid()`, así el
@@ -214,6 +242,20 @@ comprobación corre *antes* de que el trigger `crear_membresia_owner` (que
 inserta la fila en `hogar_miembros`) sea visible dentro de la misma
 sentencia. El `OR created_by = auth.uid()` es el fix: el creador siempre ve
 su propio hogar recién creado, independientemente del timing del trigger.
+
+² **Nota sobre `profiles_select_propio_o_hogar`:** la condición es
+`id = auth.uid() OR comparte_hogar_con(id)`. El primer término no es
+redundante con el segundo: un usuario recién registrado que todavía no creó
+ni se unió a ningún hogar (ej. en `/onboarding`) no comparte ningún hogar con
+nadie —ni siquiera consigo mismo, `comparte_hogar_con` requiere una fila en
+`hogar_miembros`—, así que sin `id = auth.uid()` no podría ver ni su propio
+profile hasta tener hogar.
+
+**`profiles` no tiene policy de INSERT ni de DELETE**, mismo patrón que
+`hogar_miembros`: el alta la hace el trigger `on_auth_user_created_crear_profile`
+(`SECURITY DEFINER`, corre en el contexto de `auth.users`) y el borrado lo
+hace el `ON DELETE CASCADE` de `auth.users` — el cliente nunca necesita
+insertar ni borrar un profile directamente.
 
 **`hogar_miembros` no tiene policy de INSERT ni de UPDATE.** El alta de una
 membresía solo pasa por dos caminos, ambos `SECURITY DEFINER` (corren con
@@ -288,6 +330,44 @@ const { data: nuevoCodigo } = await supabase.rpc("regenerar_codigo_hogar", {
   p_hogar_id: hogarId,
 });
 ```
+
+## Profiles
+
+Nombre/avatar por usuario, para que `/ajustes/hogar` (y cualquier otra
+pantalla que liste miembros) pueda mostrar un nombre real en vez de
+`Miembro {uuid corto}` — hoy esa pantalla lista explícitamente esa
+limitación (`app/(dashboard)/ajustes/hogar/page.tsx`).
+
+### `set_updated_at()` — trigger genérico
+
+`BEFORE UPDATE`: pone `new.updated_at = now()`. Genérico a propósito (no
+`profiles_set_updated_at`) para poder reusarlo en `on hogares` u otras
+tablas si en el futuro necesitan la misma columna, sin duplicar la función.
+
+### `crear_profile_para_usuario_nuevo()` — trigger en `auth.users`
+
+`AFTER INSERT ON auth.users FOR EACH ROW`. Es el patrón "handle_new_user"
+que documenta Supabase: crea la fila en `public.profiles` con
+`nombre_completo = raw_user_meta_data->>'full_name'`, o
+`raw_user_meta_data->>'name'` si no vino `full_name`, o `null` si no vino
+ninguno de los dos (tal como pide el enunciado). `SECURITY DEFINER` porque
+corre en el contexto de `auth.users`, fuera del alcance normal de las
+policies de `public`. El `ON CONFLICT (id) DO NOTHING` es una red de
+seguridad barata (no se espera que dispare en uso normal).
+
+Importante: es un trigger sobre una tabla de `auth`, no de `public` — se
+crea igual que cualquier otro trigger (`CREATE TRIGGER ... ON auth.users`),
+pero solo dispara para **altas nuevas**; los usuarios que ya existían antes
+de esta migración se cubren con el backfill (migración 14).
+
+### `comparte_hogar_con(p_user_id uuid) → boolean`
+
+`SECURITY DEFINER stable`, mismo motivo que `es_miembro_de_hogar`/
+`es_owner_de_hogar`: hace un self-join sobre `hogar_miembros` (¿hay algún
+`hogar_id` donde estén tanto `auth.uid()` como `p_user_id`?) y necesita
+bypassear RLS en esa consulta interna para no disparar la policy de
+`hogar_miembros` recursivamente. Es el único uso de esta función: la policy
+de `SELECT` de `profiles`.
 
 ## Funciones y vistas
 
@@ -375,6 +455,10 @@ columnas al final, no reordene ni renombre las existentes.
   `(user_id, hogar_id)`, en ese orden para servir también las queries "¿de
   qué hogares soy miembro?" con `user_id` como columna líder) — evitan
   códigos duplicados y membresías duplicadas.
+- `profiles` no suma índices nuevos: su único acceso es por `id`, que ya es
+  PK (indexado); `comparte_hogar_con` resuelve su self-join sobre
+  `hogar_miembros` con el índice `hogar_miembros_user_hogar_unique` de
+  arriba (columna líder `user_id`, sirve ambos lados del join).
 
 ## Constraints de integridad
 
@@ -389,6 +473,10 @@ columnas al final, no reordene ni renombre las existentes.
 - `hogares.codigo_invitacion ~ '^[A-Za-z0-9]{6}$'` y `unique`.
 - `hogar_miembros.rol in ('owner', 'member')` y `unique(user_id, hogar_id)`
   (no se puede duplicar membresía).
+- `profiles.id` es PK y FK a `auth.users(id)` a la vez (`on delete cascade`):
+  no puede existir un profile sin su usuario. `nombre_completo`/`avatar_url`
+  son ambos nullable, sin más constraints — no hay forma de "corromper"
+  estos dos campos de texto libre.
 
 ## Tipos TypeScript
 
@@ -428,6 +516,14 @@ errores) y `eslint` sobre los 4 archivos tocados. No se construyó UI nueva
 (pantalla de "crear/unirse a hogar", listado de miembros, etc.) — eso queda
 fuera del alcance de esta migración de base de datos.
 
+`profiles` (migraciones 13-14, sección siguiente) **no necesitó ningún
+cambio en `app/`**: es puramente aditiva (tabla nueva, sin tocar columnas ni
+policies de tablas existentes), verificado igual con `tsc --noEmit` sobre
+todo el proyecto (0 errores). Mostrar esos nombres en
+`/ajustes/hogar` en vez de `Miembro {uuid corto}` sigue siendo trabajo de
+frontend pendiente (reemplazar ese `select(... user_id ...)` por un join o
+una segunda query a `profiles`), fuera del alcance de esta migración.
+
 ## Pruebas realizadas (3 usuarios, 2 hogares)
 
 Corridas a mano contra la base local (`supabase start` + `psql`,
@@ -458,6 +554,30 @@ simulando sesiones con `set role authenticated` + `set request.jwt.claims`):
 8. `anon` sin ningún grant sobre `hogares`/`hogar_miembros` (igual que el
    resto de las tablas).
 
+### Profiles (3 usuarios, 2 hogares, mismo setup)
+
+1. Se registran 3 usuarios con metadata distinta: uno con
+   `raw_user_meta_data->>'full_name'`, uno sin metadata, uno con `'name'` en
+   vez de `'full_name'` → el trigger crea los 3 profiles automáticamente,
+   con `nombre_completo` resuelto correctamente en cada caso (incluido
+   `null` para el que no tenía nada).
+2. Usuario 1 crea un hogar; usuario 2 se une con el código; usuario 3 crea
+   el suyo aparte (mismo split que el escenario de arriba).
+3. Usuario 2 edita su propio `nombre_completo`. Usuario 1 (mismo hogar) lo
+   **lee correctamente** vía `comparte_hogar_con`; también lee el propio.
+4. Usuario 3 (otro hogar) intenta leer el profile de usuario 2 por `id`
+   directo → **0 filas**. `select count(*) from profiles` sin filtro (todo
+   lo que ese rol puede ver) también da 1 — el propio, nadie más.
+5. Usuario 1 intenta `UPDATE` sobre el profile de usuario 2 (mismo hogar,
+   pero no es "propio") → afecta 0 filas, el valor no cambia.
+6. `INSERT`/`DELETE` directos contra `profiles` → `permission denied` (sin
+   `GRANT`, ninguna policy los habilita).
+7. `updated_at` se actualiza solo al hacer `UPDATE` (probado con
+   `pg_sleep` de por medio para que el timestamp cambie visiblemente).
+8. Se borra el `auth.users` de usuario 3 (como `postgres`) → su `profile`
+   desaparece (`on delete cascade`), confirmando que no queda huérfano.
+9. `anon` sin ningún grant sobre `profiles`.
+
 ## Decisiones a revisar más adelante (no bloqueantes)
 
 - **Un usuario puede terminar en más de un hogar** (el propio, auto-creado
@@ -474,9 +594,9 @@ simulando sesiones con `set role authenticated` + `set request.jwt.claims`):
 - Nuevos usuarios que se registran **después** de esta migración y todavía
   no crearon/se unieron a un hogar no pueden cargar compras (`hogar_id`
   `NOT NULL`); `crearCompra`/`guardarAlertasConfig` devuelven un error
-  explícito en ese caso, pero no hay todavía una pantalla de onboarding
-  ("creá tu hogar o unite con un código") — es la pieza de UI que falta para
-  cerrar el flujo end-to-end.
+  explícito en ese caso. *(Actualización: `app/onboarding/` ya cubre esto —
+  el middleware fuerza pasar por ahí antes de llegar al resto de la app —
+  así que en la práctica este error ya no debería verse en uso normal.)*
 - No hay policy de `DELETE` sobre `hogares` (borrar un hogar arrastra, vía
   `ON DELETE CASCADE`/`RESTRICT`, a `hogar_miembros` y potencialmente
   bloquea por `compras`/`alertas_config` en `RESTRICT`); se dejó sin resolver
@@ -494,3 +614,16 @@ simulando sesiones con `set role authenticated` + `set request.jwt.claims`):
 - El catálogo compartido no tiene moderación (cualquier `authenticated` puede
   insertar). Para una app multi-tenant real convendría revisar si esto sigue
   siendo aceptable o si hace falta un flujo de aprobación.
+- **`profiles.avatar_url` es solo texto** — esta migración no crea ningún
+  bucket de Supabase Storage ni sus policies. Si se implementa upload de
+  avatar, hace falta eso aparte (bucket + policies de storage), y
+  `avatar_url` seguiría siendo simplemente la URL pública resultante.
+- `profiles` no tiene UI todavía: `/ajustes/hogar` sigue mostrando
+  `Miembro {uuid corto}` en vez de `nombre_completo` (ver "Cambios en app/"
+  más arriba) — es la pieza de frontend que falta para que esta migración
+  se note en pantalla.
+- `comparte_hogar_con` recorre TODOS los hogares en común entre dos
+  usuarios (no distingue "hogar activo"); si más adelante existe ese
+  concepto (ver el primer punto de esta lista), probablemente convenga que
+  la visibilidad de `profiles` siga el mismo criterio en vez de "cualquier
+  hogar en común, sea cual sea".

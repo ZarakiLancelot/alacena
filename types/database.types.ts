@@ -295,6 +295,30 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          id: string
+          nombre_completo: string | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          id: string
+          nombre_completo?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          id?: string
+          nombre_completo?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       push_subscriptions: {
         Row: {
           created_at: string
@@ -427,6 +451,7 @@ export type Database = {
         Args: { precio: number; tamano: number }
         Returns: number
       }
+      comparte_hogar_con: { Args: { p_user_id: string }; Returns: boolean }
       es_miembro_de_hogar: { Args: { p_hogar_id: string }; Returns: boolean }
       es_owner_de_hogar: { Args: { p_hogar_id: string }; Returns: boolean }
       generar_codigo_invitacion: { Args: never; Returns: string }
