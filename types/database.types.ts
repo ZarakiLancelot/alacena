@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.15"
-  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -44,6 +39,7 @@ export type Database = {
           activa: boolean
           created_at: string
           dias_antes: number
+          hogar_id: string
           id: string
           user_id: string
         }
@@ -51,6 +47,7 @@ export type Database = {
           activa?: boolean
           created_at?: string
           dias_antes?: number
+          hogar_id: string
           id?: string
           user_id?: string
         }
@@ -58,10 +55,19 @@ export type Database = {
           activa?: boolean
           created_at?: string
           dias_antes?: number
+          hogar_id?: string
           id?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "alertas_config_hogar_id_fkey"
+            columns: ["hogar_id"]
+            isOneToOne: false
+            referencedRelation: "hogares"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       compras: {
         Row: {
@@ -69,47 +75,57 @@ export type Database = {
           cantidad: number
           consumido: boolean
           created_at: string
+          created_by: string
           fecha_compra: string
           fecha_consumo: string | null
           fecha_vencimiento: string | null
+          hogar_id: string
           id: string
           precio_normal: number
           precio_oferta: number | null
           presentacion_id: string
           tienda_id: string
-          user_id: string
         }
         Insert: {
           alerta_enviada_at?: string | null
           cantidad?: number
           consumido?: boolean
           created_at?: string
+          created_by?: string
           fecha_compra?: string
           fecha_consumo?: string | null
           fecha_vencimiento?: string | null
+          hogar_id: string
           id?: string
           precio_normal: number
           precio_oferta?: number | null
           presentacion_id: string
           tienda_id: string
-          user_id?: string
         }
         Update: {
           alerta_enviada_at?: string | null
           cantidad?: number
           consumido?: boolean
           created_at?: string
+          created_by?: string
           fecha_compra?: string
           fecha_consumo?: string | null
           fecha_vencimiento?: string | null
+          hogar_id?: string
           id?: string
           precio_normal?: number
           precio_oferta?: number | null
           presentacion_id?: string
           tienda_id?: string
-          user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "compras_hogar_id_fkey"
+            columns: ["hogar_id"]
+            isOneToOne: false
+            referencedRelation: "hogares"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "compras_presentacion_id_fkey"
             columns: ["presentacion_id"]
@@ -146,6 +162,62 @@ export type Database = {
             referencedColumns: ["tienda_id"]
           },
         ]
+      }
+      hogar_miembros: {
+        Row: {
+          hogar_id: string
+          id: string
+          joined_at: string
+          rol: string
+          user_id: string
+        }
+        Insert: {
+          hogar_id: string
+          id?: string
+          joined_at?: string
+          rol?: string
+          user_id: string
+        }
+        Update: {
+          hogar_id?: string
+          id?: string
+          joined_at?: string
+          rol?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hogar_miembros_hogar_id_fkey"
+            columns: ["hogar_id"]
+            isOneToOne: false
+            referencedRelation: "hogares"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hogares: {
+        Row: {
+          codigo_invitacion: string
+          created_at: string
+          created_by: string | null
+          id: string
+          nombre: string
+        }
+        Insert: {
+          codigo_invitacion?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nombre: string
+        }
+        Update: {
+          codigo_invitacion?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nombre?: string
+        }
+        Relationships: []
       }
       presentaciones: {
         Row: {
@@ -223,6 +295,30 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          id: string
+          nombre_completo: string | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          id: string
+          nombre_completo?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          id?: string
+          nombre_completo?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       push_subscriptions: {
         Row: {
           created_at: string
@@ -280,17 +376,28 @@ export type Database = {
           dias_antes: number | null
           dias_para_vencer: number | null
           fecha_vencimiento: string | null
+          hogar_id: string | null
           producto_nombre: string | null
           tienda_nombre: string | null
           user_id: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "compras_hogar_id_fkey"
+            columns: ["hogar_id"]
+            isOneToOne: false
+            referencedRelation: "hogares"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vista_precio_unitario: {
         Row: {
           categoria: string | null
           compra_id: string | null
+          created_by: string | null
           fecha_compra: string | null
+          hogar_id: string | null
           marca: string | null
           precio_normal: number | null
           precio_oferta: number | null
@@ -303,15 +410,23 @@ export type Database = {
           tienda_id: string | null
           tienda_nombre: string | null
           unidad: string | null
-          user_id: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "compras_hogar_id_fkey"
+            columns: ["hogar_id"]
+            isOneToOne: false
+            referencedRelation: "hogares"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vista_stock_actual: {
         Row: {
           cantidad_total_pendiente: number | null
           categoria: string | null
           compras_pendientes: number | null
+          hogar_id: string | null
           marca: string | null
           presentacion_id: string | null
           producto_id: string | null
@@ -319,9 +434,16 @@ export type Database = {
           proxima_fecha_vencimiento: string | null
           tamaño: number | null
           unidad: string | null
-          user_id: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "compras_hogar_id_fkey"
+            columns: ["hogar_id"]
+            isOneToOne: false
+            referencedRelation: "hogares"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
@@ -329,6 +451,12 @@ export type Database = {
         Args: { precio: number; tamano: number }
         Returns: number
       }
+      comparte_hogar_con: { Args: { p_user_id: string }; Returns: boolean }
+      es_miembro_de_hogar: { Args: { p_hogar_id: string }; Returns: boolean }
+      es_owner_de_hogar: { Args: { p_hogar_id: string }; Returns: boolean }
+      generar_codigo_invitacion: { Args: never; Returns: string }
+      regenerar_codigo_hogar: { Args: { p_hogar_id: string }; Returns: string }
+      unirse_a_hogar: { Args: { p_codigo: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never
@@ -464,3 +592,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+

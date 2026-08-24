@@ -4,6 +4,7 @@ import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { FiCheckCircle } from "react-icons/fi";
 import { Combobox } from "@/components/compras/Combobox";
 import { PresentacionField, type Presentacion } from "@/components/compras/PresentacionField";
+import { DuplicadoBanner } from "@/components/compras/DuplicadoBanner";
 import { SubmitButton } from "@/components/SubmitButton";
 import { crearCompra } from "@/app/(dashboard)/compras/actions";
 import { resolveCombo, today } from "@/lib/utils";
@@ -39,6 +40,7 @@ export function NuevaCompraForm({
 
   const [tiendaText, setTiendaText] = useState("");
   const [productoText, setProductoText] = useState("");
+  const [fechaCompra, setFechaCompra] = useState(today());
 
   const tiendaItems = useMemo(
     () => tiendas.map((t) => ({ id: t.id, label: t.nombre })),
@@ -56,6 +58,13 @@ export function NuevaCompraForm({
   const productoIdExistente =
     productoSelection.type === "existing" ? productoSelection.id : null;
 
+  const tiendaSelection = useMemo(
+    () => resolveCombo(tiendaItems, tiendaText),
+    [tiendaItems, tiendaText]
+  );
+  const tiendaIdExistente =
+    tiendaSelection.type === "existing" ? tiendaSelection.id : null;
+
   // Patrón "ajustar estado durante el render" (no un efecto: evita el
   // set-state-in-effect lint) para vaciar los combobox controlados apenas
   // llega un nuevo resultado exitoso del action.
@@ -65,6 +74,7 @@ export function NuevaCompraForm({
     if (state.success) {
       setTiendaText("");
       setProductoText("");
+      setFechaCompra(today());
     }
   }
 
@@ -172,7 +182,8 @@ export function NuevaCompraForm({
           <input
             type="date"
             name="fecha_compra"
-            defaultValue={today()}
+            value={fechaCompra}
+            onChange={(e) => setFechaCompra(e.target.value)}
             required
             className="rounded-lg border border-zinc-300 px-3 py-3 text-base focus:border-emerald-600 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
           />
@@ -191,6 +202,12 @@ export function NuevaCompraForm({
           <FieldErrors errors={state.fieldErrors?.fecha_vencimiento} />
         </div>
       </div>
+
+      <DuplicadoBanner
+        tiendaId={tiendaIdExistente}
+        tiendaNombre={tiendaText}
+        fecha={fechaCompra}
+      />
 
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">

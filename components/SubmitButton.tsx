@@ -19,7 +19,7 @@ export function SubmitButton({
       type="submit"
       disabled={pending}
       className={cn(
-        "w-full rounded-lg bg-emerald-600 px-4 py-3 text-base font-medium text-white transition-colors",
+        "w-full cursor-pointer rounded-lg bg-emerald-600 px-4 py-3 text-base font-medium text-white transition-colors",
         "active:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60",
         className
       )}

@@ -8,6 +8,7 @@ import {
   getOrCreateProducto,
   getOrCreatePresentacion,
 } from "@/lib/supabase/catalog";
+import { getHogarIdActual } from "@/lib/supabase/hogar";
 import { decodeCombo } from "@/lib/utils";
 import type { ActionState } from "@/lib/types";
 
@@ -31,6 +32,17 @@ export async function crearCompra(
   const productoSel = decodeCombo(data.producto);
   if (!tiendaSel || !productoSel) {
     return { error: "Faltan datos de tienda o producto." };
+  }
+
+  // supabase/migrations/20260823160300 hizo hogar_id obligatorio en compras:
+  // toda compra pertenece a un hogar, no solo a quien la carga. Se resuelve
+  // acá (antes que nada) para no hacer trabajo de más si el usuario todavía
+  // no tiene hogar.
+  const hogarId = await getHogarIdActual(supabase, user.id);
+  if (!hogarId) {
+    return {
+      error: "Tu cuenta todavía no pertenece a ningún hogar. Creá uno o unite con un código de invitación.",
+    };
   }
 
   try {
@@ -78,7 +90,8 @@ export async function crearCompra(
     }
 
     const { error: insertError } = await supabase.from("compras").insert({
-      user_id: user.id,
+      created_by: user.id,
+      hogar_id: hogarId,
       presentacion_id: presentacionId,
       tienda_id: tiendaId,
       precio_normal: data.precio_normal,
@@ -102,4 +115,34 @@ export async function crearCompra(
   revalidatePath("/compras");
 
   return { success: true };
+}
+
+const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Chequeo de "posible duplicado" para el banner no bloqueante del formulario
+ * de nueva compra: ¿ya existe una compra del hogar en esa tienda, esa fecha?
+ * No se llama desde un <form> (no es un Server Action de submit), se invoca
+ * directo desde el cliente (ver components/compras/DuplicadoBanner.tsx).
+ *
+ * No hace falta resolver ni filtrar por hogar_id acá: la policy de SELECT de
+ * `compras` ya limita el resultado a las del hogar del usuario logueado.
+ * `tiendaId` solo tiene sentido para una tienda YA EXISTENTE (una tienda
+ * nueva, por definición, no tiene historial), así que el caller solo debe
+ * llamar esto cuando el combobox de tienda resolvió a un id real.
+ */
+export async function buscarComprasDuplicadas(
+  tiendaId: string,
+  fechaCompra: string
+): Promise<number> {
+  if (!tiendaId || !FECHA_RE.test(fechaCompra)) return 0;
+
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("compras")
+    .select("id", { count: "exact", head: true })
+    .eq("tienda_id", tiendaId)
+    .eq("fecha_compra", fechaCompra);
+
+  return count ?? 0;
 }

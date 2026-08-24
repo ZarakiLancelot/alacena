@@ -31,6 +31,11 @@ export default async function InventarioPage({
   const { categoria } = await searchParams;
   const supabase = await createClient();
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
   const [{ data: comprasRaw }, { data: productosCategorias }, { data: alertaConfig }] =
     await Promise.all([
       supabase
@@ -41,7 +46,12 @@ export default async function InventarioPage({
         .eq("consumido", false)
         .order("fecha_vencimiento", { ascending: true, nullsFirst: false }),
       supabase.from("productos").select("categoria").not("categoria", "is", null),
-      supabase.from("alertas_config").select("dias_antes").maybeSingle(),
+      // Desde supabase/migrations/20260823160300, alertas_config es visible
+      // para todo el hogar (no solo para su dueño): sin el .eq acá, un hogar
+      // con 2+ integrantes que configuraron sus alertas devolvería más de
+      // una fila y .maybeSingle() lanzaría un error. El umbral que se
+      // muestra en esta pantalla sigue siendo el propio del usuario logueado.
+      supabase.from("alertas_config").select("dias_antes").eq("user_id", user.id).maybeSingle(),
     ]);
 
   const compras = (comprasRaw ?? []) as unknown as CompraPendiente[];
@@ -82,7 +92,7 @@ export default async function InventarioPage({
           </select>
           <button
             type="submit"
-            className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium dark:border-zinc-700"
+            className="cursor-pointer rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium dark:border-zinc-700"
           >
             Filtrar
           </button>
@@ -124,9 +134,9 @@ export default async function InventarioPage({
                 <form action={consumirCompra.bind(null, compra.id)}>
                   <SubmitButton
                     pendingLabel="…"
-                    className="w-auto whitespace-nowrap bg-zinc-800 px-3 py-2 text-sm dark:bg-zinc-100 dark:text-zinc-900"
+                    className="w-auto whitespace-nowrap bg-sky-600 px-3 py-2 text-sm active:bg-sky-700 dark:bg-sky-500 dark:active:bg-sky-600"
                   >
-                    Consumir
+                    Ya no tengo
                   </SubmitButton>
                 </form>
               </li>
