@@ -1,12 +1,13 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 export default async function HistorialPage({
   searchParams,
 }: {
-  searchParams: Promise<{ producto?: string; tienda?: string }>;
+  searchParams: Promise<{ producto?: string; tienda?: string; fecha?: string }>;
 }) {
-  const { producto, tienda } = await searchParams;
+  const { producto, tienda, fecha } = await searchParams;
   const supabase = await createClient();
 
   const [{ data: productos }, { data: tiendas }] = await Promise.all([
@@ -21,6 +22,7 @@ export default async function HistorialPage({
 
   if (producto) query = query.eq("producto_id", producto);
   if (tienda) query = query.eq("tienda_id", tienda);
+  if (fecha) query = query.eq("fecha_compra", fecha);
 
   const { data: historial } = await query;
 
@@ -55,12 +57,28 @@ export default async function HistorialPage({
             </option>
           ))}
         </select>
-        <button
-          type="submit"
-          className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium dark:border-zinc-700"
-        >
-          Filtrar
-        </button>
+        <input
+          type="date"
+          name="fecha"
+          defaultValue={fecha ?? ""}
+          className="rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+        />
+        <div className="flex gap-2">
+          <button
+            type="submit"
+            className="flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium dark:border-zinc-700"
+          >
+            Filtrar
+          </button>
+          {producto || tienda || fecha ? (
+            <Link
+              href="/historial"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-500 dark:text-zinc-400"
+            >
+              Quitar filtros
+            </Link>
+          ) : null}
+        </div>
       </form>
 
       {!historial || historial.length === 0 ? (

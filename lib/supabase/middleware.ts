@@ -1,5 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import type { Database } from "@/types/database.types";
+import { getHogarIdActual } from "@/lib/supabase/hogar";
+
+// Onboarding obligatorio (ver supabase/README.md, sección "Decisiones a
+// revisar"): compras/alertas_config tienen `hogar_id` NOT NULL desde
+// 20260823160300, así que un usuario sin hogar no puede cargar nada. Esta
+// ruta es la única salida de ese estado (crear un hogar o unirse por código).
+const ONBOARDING_PATH = "/onboarding";
 
 // Páginas de autenticación: no requieren sesión, y si el usuario YA está logueado
 // se lo saca de ahí (ver el segundo `if` de abajo) — no tiene sentido ver /login
@@ -34,7 +42,7 @@ const PUBLIC_PREFIXES = ["/serwist/", "/api/cron/"];
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
-  const supabase = createServerClient(
+  const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
@@ -78,6 +86,27 @@ export async function updateSession(request: NextRequest) {
     url.pathname = "/inventario";
     url.search = "";
     return NextResponse.redirect(url);
+  }
+
+  if (user && !isPublicPath) {
+    // `.catch` deliberado: si la consulta falla (ej. blip de red), se deja
+    // pasar el request en vez de atrapar a todo el mundo en un loop de
+    // redirects — el error real se manifiesta igual en la página destino.
+    const hogarId = await getHogarIdActual(supabase, user.id).catch(() => undefined);
+
+    if (hogarId === null && pathname !== ONBOARDING_PATH) {
+      const url = request.nextUrl.clone();
+      url.pathname = ONBOARDING_PATH;
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+
+    if (hogarId && pathname === ONBOARDING_PATH) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/inventario";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
   }
 
   // IMPORTANTE: hay que devolver `supabaseResponse` tal cual (o clonar sus
