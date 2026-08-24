@@ -8,6 +8,7 @@ import {
   getOrCreateProducto,
   getOrCreatePresentacion,
 } from "@/lib/supabase/catalog";
+import { getHogarIdActual } from "@/lib/supabase/hogar";
 import { decodeCombo } from "@/lib/utils";
 import type { ActionState } from "@/lib/types";
 
@@ -31,6 +32,17 @@ export async function crearCompra(
   const productoSel = decodeCombo(data.producto);
   if (!tiendaSel || !productoSel) {
     return { error: "Faltan datos de tienda o producto." };
+  }
+
+  // supabase/migrations/20260823160300 hizo hogar_id obligatorio en compras:
+  // toda compra pertenece a un hogar, no solo a quien la carga. Se resuelve
+  // acá (antes que nada) para no hacer trabajo de más si el usuario todavía
+  // no tiene hogar.
+  const hogarId = await getHogarIdActual(supabase, user.id);
+  if (!hogarId) {
+    return {
+      error: "Tu cuenta todavía no pertenece a ningún hogar. Creá uno o unite con un código de invitación.",
+    };
   }
 
   try {
@@ -78,7 +90,8 @@ export async function crearCompra(
     }
 
     const { error: insertError } = await supabase.from("compras").insert({
-      user_id: user.id,
+      created_by: user.id,
+      hogar_id: hogarId,
       presentacion_id: presentacionId,
       tienda_id: tiendaId,
       precio_normal: data.precio_normal,
