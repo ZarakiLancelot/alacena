@@ -70,6 +70,14 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SERVICE_ROLE_KEY=       # server-only, bypassea RLS — usada por el cron de vencimientos
 
+# Dominio real de la app (sin barra final), para el link de confirmación del
+# email de signup (ver lib/site-url.ts). Vacía en local: cae al origin de la
+# request actual. EN VERCEL HAY QUE SETEARLA con el dominio de producción,
+# ej. https://alacena.vercel.app — si no, el link de confirmación de email
+# apunta a localhost:3000 (o al dominio del deploy que la haya generado, ver
+# nota en "Deploy" más abajo).
+NEXT_PUBLIC_SITE_URL=
+
 # Web Push (VAPID) — generar con `npx web-push generate-vapid-keys --json`
 NEXT_PUBLIC_VAPID_PUBLIC_KEY=
 VAPID_PUBLIC_KEY=
@@ -140,6 +148,7 @@ lib/
   analytics.ts       # agregaciones para /analytics (lee vista_precio_unitario)
   supabase/           # clientes de Supabase (browser/server/middleware/admin)
   push/               # helpers de Web Push
+  site-url.ts         # URL base para emailRedirectTo (signup) — ver Deploy
   utils.ts, types.ts, validations.ts
 
 supabase/
@@ -157,3 +166,14 @@ vencimientos). Cualquier plataforma que corra Next.js 16 sirve, siempre que
 puedas configurar las variables de entorno y disparar
 `POST /api/cron/vencimientos` (con el header
 `Authorization: Bearer $CRON_SECRET`) una vez por día.
+
+**Importante:** configurar `NEXT_PUBLIC_SITE_URL` en las variables de entorno
+de Vercel con el dominio real de producción (ej.
+`https://alacena.vercel.app`, sin barra final). Sin esto, el link de
+confirmación del email de signup puede terminar apuntando a
+`http://localhost:3000` (si quedó así configurado el "Site URL" del proyecto
+en el dashboard de Supabase) en vez de al sitio real — ver `lib/site-url.ts`.
+También hay que agregar ese mismo dominio (+ `/login`) a la lista de
+**Redirect URLs** permitidas en Supabase (Authentication → URL
+Configuration): Supabase rechaza cualquier `emailRedirectTo` que no esté en
+esa lista.
