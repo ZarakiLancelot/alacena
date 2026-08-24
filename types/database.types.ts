@@ -69,6 +69,27 @@ export type Database = {
           },
         ]
       }
+      cadenas: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          nombre: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nombre: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nombre?: string
+        }
+        Relationships: []
+      }
       compras: {
         Row: {
           alerta_enviada_at: string | null
@@ -348,24 +369,45 @@ export type Database = {
       }
       tiendas: {
         Row: {
+          cadena_id: string | null
           created_at: string
           created_by: string | null
           id: string
           nombre: string
+          ubicacion: string | null
         }
         Insert: {
+          cadena_id?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
           nombre: string
+          ubicacion?: string | null
         }
         Update: {
+          cadena_id?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
           nombre?: string
+          ubicacion?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tiendas_cadena_id_fkey"
+            columns: ["cadena_id"]
+            isOneToOne: false
+            referencedRelation: "cadenas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tiendas_cadena_id_fkey"
+            columns: ["cadena_id"]
+            isOneToOne: false
+            referencedRelation: "vista_precio_unitario"
+            referencedColumns: ["cadena_id"]
+          },
+        ]
       }
     }
     Views: {
@@ -393,6 +435,8 @@ export type Database = {
       }
       vista_precio_unitario: {
         Row: {
+          cadena_id: string | null
+          cadena_nombre: string | null
           categoria: string | null
           compra_id: string | null
           created_by: string | null
@@ -409,6 +453,7 @@ export type Database = {
           tamaño: number | null
           tienda_id: string | null
           tienda_nombre: string | null
+          tienda_ubicacion: string | null
           unidad: string | null
         }
         Relationships: [

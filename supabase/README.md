@@ -9,6 +9,8 @@ Tracking personal de compras de supermercado. Backend: Supabase (Postgres 17) +
 ```mermaid
 erDiagram
     auth_users ||--o{ tiendas : "created_by (opcional)"
+    auth_users ||--o{ cadenas : "created_by (opcional)"
+    cadenas ||--o{ tiendas : "cadena_id (opcional)"
     auth_users ||--o{ productos : "created_by (opcional)"
     auth_users ||--o{ presentaciones : "created_by (opcional)"
     auth_users ||--o{ compras : "created_by (auditoría)"
@@ -49,9 +51,17 @@ erDiagram
         text rol "owner | member"
         timestamptz joined_at
     }
+    cadenas {
+        uuid id PK
+        text nombre "único"
+        uuid created_by FK
+        timestamptz created_at
+    }
     tiendas {
         uuid id PK
         text nombre
+        uuid cadena_id FK "opcional"
+        text ubicacion "opcional, ej. Fraijanes"
         uuid created_by FK
         timestamptz created_at
     }
@@ -106,7 +116,8 @@ auth.users
    │
    ├── 🔒 profiles            (1:1, auto-creado al registrarse — visible además
    │                           a quien comparta un hogar con vos, ver más abajo)
-   ├── 🌐 tiendas             (compartida; created_by = autor)
+   ├── 🌐 cadenas             (compartida; created_by = autor)
+   │        └── 🌐 tiendas    (sucursal: cadena_id + ubicacion, ambos opcionales)
    ├── 🌐 productos           (compartida; created_by = autor)
    │        └── 🌐 presentaciones (tamaño+unidad de un producto)
    │
@@ -119,15 +130,26 @@ auth.users
 
 ## Decisión de diseño: qué es compartido y qué es privado
 
-- **`tiendas`, `productos`, `presentaciones` → catálogo compartido** entre todos
-  los usuarios. Cualquier usuario autenticado puede leer y crear filas nuevas;
-  solo quien creó una fila (`created_by`) puede editarla o borrarla.
-  **Por qué:** el objetivo #3 del schema es comparar el precio de "el mismo
-  producto" entre tiendas. Si cada usuario tuviera su propia copia de "Leche
-  Entera 1L", la comparación entre compras de distintos días/tiendas —incluso
-  del mismo usuario— se rompería por duplicados, y no tendría sentido de
-  catálogo colaborativo. `created_by` es nullable y se limpia (`on delete set
-  null`) si el usuario es borrado, así el catálogo compartido no se destruye.
+- **`tiendas`, `cadenas`, `productos`, `presentaciones` → catálogo compartido**
+  entre todos los usuarios. Cualquier usuario autenticado puede leer y crear
+  filas nuevas; solo quien creó una fila (`created_by`) puede editarla o
+  borrarla. **Por qué:** el objetivo #3 del schema es comparar el precio de
+  "el mismo producto" entre tiendas. Si cada usuario tuviera su propia copia
+  de "Leche Entera 1L", la comparación entre compras de distintos
+  días/tiendas —incluso del mismo usuario— se rompería por duplicados, y no
+  tendría sentido de catálogo colaborativo. `created_by` es nullable y se
+  limpia (`on delete set null`) si el usuario es borrado, así el catálogo
+  compartido no se destruye.
+- **`tiendas` vs. `cadenas`: sucursal vs. marca.** Una fila de `tiendas` es
+  una ubicación física puntual ("Walmart Fraijanes"); `cadenas` agrupa todas
+  las sucursales que son la misma marca ("Walmart"), para poder comparar
+  precios tanto local-por-local como cadena-completa
+  (`vista_precio_unitario`, ver más abajo). `tiendas.cadena_id` es **opcional
+  a propósito**: muchas tiendas (de barrio, independientes) no pertenecen a
+  ninguna cadena catalogada, y el catálogo de `cadenas` no pretende ser
+  exhaustivo — arranca con 6 sembradas (ver "Migraciones") y crece igual que
+  `tiendas`/`productos`, con altas de cualquier usuario. Ver "Cadenas de
+  supermercado" más abajo para el detalle de constraints.
 - **`compras`, `alertas_config` → compartidas dentro del hogar** (desde
   `20260823160300`). Cualquier miembro del `hogar_id` de la fila puede
   ver/editar/borrar, no solo quien la creó — es el punto central del soporte
@@ -201,6 +223,31 @@ En `supabase/migrations/`, en orden de aplicación:
 14. `20260823170100_backfill_profiles.sql` — migración de datos: crea un
     `profile` para cada usuario existente sin uno (el trigger de la
     migración 13 solo dispara para altas nuevas). Idempotente.
+15. `20260823180000_cadenas.sql` — tabla `cadenas` (RLS/grants, mismo patrón
+    que `tiendas`/`productos`); agrega `tiendas.cadena_id` (FK opcional,
+    `on delete set null`) y `tiendas.ubicacion` (opcional); reemplaza el
+    índice único de `tiendas.nombre` (antes global) por uno parcial que solo
+    aplica a tiendas **sin** cadena; agrega el único parcial
+    `(cadena_id, ubicacion)` para no duplicar una sucursal. Ver "Cadenas de
+    supermercado" más abajo — el detalle de por qué hizo falta tocar el
+    índice viejo importa.
+16. `20260823180100_seed_cadenas.sql` — siembra 6 cadenas (PriceSmart,
+    Walmart, Paiz, La Torre, Maxi Despensa, Suma) vía
+    `INSERT ... ON CONFLICT DO NOTHING`, idempotente.
+17. `20260823180200_vista_precio_unitario_cadena.sql` — recrea
+    `vista_precio_unitario` agregando `tienda_ubicacion`, `cadena_id` y
+    `cadena_nombre` (`LEFT JOIN cadenas`, quedan en `null` si la tienda no
+    tiene cadena) junto a la info de tienda existente.
+18. `20260824090000_hogares_nombre_update_column_grant.sql` — cierra un
+    hueco de la policy `hogares_update_owner` (migración 9): RLS la
+    restringía por FILA (solo el owner, solo su hogar) pero no por COLUMNA,
+    así que el owner podía cambiar `codigo_invitacion` con un `UPDATE`
+    directo, saltándose `regenerar_codigo_hogar()`. Restringe el `GRANT
+    UPDATE` de `hogares` a la columna `nombre` únicamente, y pasa
+    `regenerar_codigo_hogar` a `SECURITY DEFINER` con su propio chequeo de
+    `es_owner_de_hogar` (ya no puede depender del `GRANT`/RLS genérico para
+    autorizar el cambio de `codigo_invitacion`). Ver la sección "Hogares
+    (soporte multi-usuario)" más abajo.
 
 ### Nota sobre GRANTs (importante en este proyecto)
 
@@ -219,9 +266,10 @@ en todas las tablas de `public`, `profiles` incluida.
 | Tabla | SELECT | INSERT | UPDATE | DELETE |
 |---|---|---|---|---|
 | `tiendas` | cualquier `authenticated` | `authenticated`, `created_by = auth.uid()` | solo el creador | solo el creador |
+| `cadenas` | cualquier `authenticated` | `authenticated`, `created_by = auth.uid()` | solo el creador | solo el creador |
 | `productos` | cualquier `authenticated` | `authenticated`, `created_by = auth.uid()` | solo el creador | solo el creador |
 | `presentaciones` | cualquier `authenticated` | `authenticated`, `created_by = auth.uid()` | solo el creador | solo el creador |
-| `hogares` | miembro del hogar (o `created_by = auth.uid()`, ver nota¹) | `authenticated`, `created_by = auth.uid()` | solo `owner` | — (sin policy) |
+| `hogares` | miembro del hogar (o `created_by = auth.uid()`, ver nota¹) | `authenticated`, `created_by = auth.uid()` | solo `owner`, y solo la columna `nombre` (ver nota³) | — (sin policy) |
 | `hogar_miembros` | miembro del hogar | — (solo vía trigger/RPC, ver abajo) | — (sin policy) | uno mismo, o `owner` de cualquiera |
 | `compras` | cualquier miembro del `hogar_id` | miembro del hogar, `created_by = auth.uid()` | cualquier miembro del hogar | cualquier miembro del hogar |
 | `alertas_config` | cualquier miembro del `hogar_id` | miembro del hogar, `user_id = auth.uid()` | cualquier miembro del hogar | cualquier miembro del hogar |
@@ -256,6 +304,18 @@ profile hasta tener hogar.
 (`SECURITY DEFINER`, corre en el contexto de `auth.users`) y el borrado lo
 hace el `ON DELETE CASCADE` de `auth.users` — el cliente nunca necesita
 insertar ni borrar un profile directamente.
+
+³ **Nota sobre el UPDATE de `hogares`, columna por columna:** la policy
+`hogares_update_owner` (RLS, por fila) no cambió, pero desde la migración 18
+el `GRANT UPDATE` de la tabla ya no es genérico — `authenticated` solo puede
+actualizar la columna `nombre`. `codigo_invitacion` (y `id`/`created_by`/
+`created_at`) quedan fuera de ese GRANT a propósito: cambiarlo tiene que
+pasar por `regenerar_codigo_hogar()`, que valida el mismo "es owner" por su
+cuenta (ver la sección "Hogares (soporte multi-usuario)"). Un `UPDATE` que
+intente tocar `codigo_invitacion` —aunque venga junto con un cambio válido
+de `nombre` en el mismo statement— falla entero con "permission denied for
+table hogares", desde la capa de privilegios de Postgres, antes de que RLS
+llegue a evaluarse.
 
 **`hogar_miembros` no tiene policy de INSERT ni de UPDATE.** El alta de una
 membresía solo pasa por dos caminos, ambos `SECURITY DEFINER` (corren con
@@ -312,12 +372,25 @@ Valida el código (case-insensitive, `upper(btrim(...))`), agrega a
 ### `regenerar_codigo_hogar(hogar_id uuid) → text` (RPC)
 
 Genera un código nuevo (vía `generar_codigo_invitacion()`) y actualiza
-`hogares.codigo_invitacion`. A propósito **no** es `SECURITY DEFINER`:
-depende de la policy de UPDATE de `hogares` (`es_owner_de_hogar`) para
-autorizar. Si el `UPDATE` afecta 0 filas —porque el hogar no existe o quien
-llama no es `owner`— la función lanza una única excepción genérica
+`hogares.codigo_invitacion`. Si quien llama no es `owner` del hogar (o el
+`hogar_id` no existe), lanza una única excepción genérica
 (`errcode = '42501'`) sin distinguir el motivo, para no filtrar si un
 `hogar_id` existe.
+
+**Historial de esta función:** originalmente era `SECURITY INVOKER` y se
+apoyaba en la policy de UPDATE de `hogares` (`es_owner_de_hogar`) para
+autorizar — como esa policy solo filtraba por fila, no por columna,
+`authenticated` terminaba con GRANT UPDATE genérico sobre toda la tabla, y
+cualquier owner podía hacer
+`update hogares set codigo_invitacion = '...' where id = ...` directo desde
+el cliente, sin pasar por esta función (ni por su generación aleatoria).
+Desde la migración 18 (`hogares_nombre_update_column_grant.sql`),
+`authenticated` solo tiene GRANT UPDATE sobre `hogares.nombre` — así que
+esta función pasó a `SECURITY DEFINER` (corre con los privilegios del dueño
+de la función, sin esa restricción de columna) y valida `es_owner_de_hogar`
+**ella misma**, en vez de depender del GRANT+RLS de la tabla. Verificado
+localmente que un usuario cualquiera (ni siquiera miembro del hogar) sigue
+sin poder llamarla con éxito para un `hogar_id` ajeno.
 
 ### Ejemplo de uso desde `supabase-js`
 
@@ -369,6 +442,43 @@ bypassear RLS en esa consulta interna para no disparar la policy de
 `hogar_miembros` recursivamente. Es el único uso de esta función: la policy
 de `SELECT` de `profiles`.
 
+## Cadenas de supermercado
+
+### Por qué se tocó el índice único viejo de `tiendas.nombre`
+
+El único de la migración 1 (`tiendas_nombre_unique_idx`) era **global**:
+ninguna otra tienda podía llamarse "Walmart" en todo el catálogo. Eso choca
+directamente con el objetivo de esta migración — que "Walmart Fraijanes" y
+"Walmart Miraflores" sean dos filas de `tiendas` válidas con el mismo
+`nombre`. Se reemplazó por una versión **parcial** (`where cadena_id is
+null`): las tiendas sin cadena (de barrio, independientes) siguen sin poder
+duplicar nombre, exactamente como antes; las que sí tienen `cadena_id` ya no
+dependen del nombre para no duplicarse — de eso se encarga
+`tiendas_cadena_ubicacion_unique_idx` (único parcial sobre
+`(cadena_id, ubicacion)`, solo cuando ambos no son null).
+
+Esto es 100% compatible con el flujo existente de alta de tiendas
+(`lib/supabase/catalog.ts: getOrCreateTienda`): ese código nunca setea
+`cadena_id`, así que toda tienda creada desde la UI actual sigue cayendo en
+"sin cadena" y se sigue de-duplicando por nombre exactamente igual que
+antes. No hizo falta tocar `app/` para esta migración (verificado con
+`tsc --noEmit` sobre todo el proyecto).
+
+### Semilla y edición de las cadenas sembradas
+
+Las 6 cadenas de la migración 16 se insertan corriendo como el rol
+`postgres` de las migraciones, no como un usuario real — `created_by`
+termina en `null` (`default auth.uid()` no resuelve nada fuera de una
+sesión autenticada). Consecuencia observada al probar: **ningún usuario
+puede editar ni borrar esas 6 filas sembradas** (la policy de
+`UPDATE`/`DELETE` exige `created_by = auth.uid()`, y `null = auth.uid()`
+nunca es cierto). Es el mismo comportamiento que ya tenían las policies de
+`tiendas`/`productos` para cualquier dato cargado sin sesión — no es un caso
+especial de `cadenas`, pero vale la pena dejarlo explícito porque es la
+primera vez que este proyecto siembra filas en una tabla con este patrón de
+RLS. Corregir el nombre de una cadena sembrada (typo, ej.) requiere el
+`service_role` o una migración nueva, no el flujo normal de la app.
+
 ## Funciones y vistas
 
 ### `calcular_precio_unitario(precio numeric, tamano numeric) → numeric`
@@ -380,19 +490,30 @@ cero). Es el bloque de cálculo que reutiliza `vista_precio_unitario`.
 ### `vista_precio_unitario` — requisito 3
 
 Una fila por compra visible para el usuario (todo su hogar, por RLS de
-`compras`) con producto, presentación y tienda ya resueltos, más
+`compras`) con producto, presentación, tienda y cadena ya resueltos, más
 `precio_pagado` (`precio_oferta` si existe, si no `precio_normal`) y
 `precio_por_unidad` (`precio_pagado / tamaño`). Expone `hogar_id` y
 `created_by` (antes exponía `user_id`; se renombró junto con la columna de
 `compras` — ver migración 10 — verificando primero que ningún código de
-`app/` leyera ese campo). Permite comparar el mismo producto entre tiendas,
-por ejemplo:
+`app/` leyera ese campo). Desde la migración 17 también expone
+`tienda_ubicacion`, `cadena_id` y `cadena_nombre` (`LEFT JOIN cadenas` sobre
+`tiendas.cadena_id`: quedan en `null` si la tienda no tiene cadena
+catalogada — la mayoría de las tiendas de barrio). Permite comparar el
+mismo producto tanto por sucursal individual como por cadena completa:
 
 ```sql
-select tienda_nombre, precio_por_unidad
+-- por sucursal individual
+select tienda_nombre, tienda_ubicacion, precio_por_unidad
 from vista_precio_unitario
 where producto_id = '...'
 order by precio_por_unidad asc;
+
+-- por cadena completa (promedio entre todas sus sucursales)
+select cadena_nombre, avg(precio_por_unidad) as promedio
+from vista_precio_unitario
+where producto_id = '...'
+group by cadena_nombre
+order by promedio asc nulls last;
 ```
 
 ### `vista_stock_actual` — requisito 4
@@ -435,6 +556,9 @@ Las tres se recrean con `DROP VIEW` + `CREATE VIEW` en la migración 12 (no
 `CREATE OR REPLACE VIEW`): agregan/renombran columnas antes de la última
 posición, y Postgres solo permite que `CREATE OR REPLACE VIEW` *agregue*
 columnas al final, no reordene ni renombre las existentes.
+`vista_precio_unitario` se vuelve a recrear así en la migración 17, para
+poner `tienda_ubicacion`/`cadena_id`/`cadena_nombre` junto a la info de
+tienda en vez de al final.
 
 ## Índices (requisito 5)
 
@@ -459,6 +583,15 @@ columnas al final, no reordene ni renombre las existentes.
   PK (indexado); `comparte_hogar_con` resuelve su self-join sobre
   `hogar_miembros` con el índice `hogar_miembros_user_hogar_unique` de
   arriba (columna líder `user_id`, sirve ambos lados del join).
+- `tiendas_cadena_id_idx` — la comparación por cadena de
+  `vista_precio_unitario` hace `join`/agrupa por `tiendas.cadena_id`.
+  `cadenas_nombre_unique_idx` (normalizado, mismo criterio que
+  `tiendas`/`productos`) y `tiendas_cadena_ubicacion_unique_idx` (parcial,
+  `(cadena_id, ubicacion)` solo cuando ambos no son null) — evitan cadenas
+  duplicadas y sucursales duplicadas de una misma cadena, respectivamente.
+  `tiendas_nombre_unique_idx` sigue existiendo pero cambió de forma: ahora es
+  parcial (`where cadena_id is null`) — ver "Cadenas de supermercado" más
+  arriba para el porqué.
 
 ## Constraints de integridad
 
@@ -477,6 +610,11 @@ columnas al final, no reordene ni renombre las existentes.
   no puede existir un profile sin su usuario. `nombre_completo`/`avatar_url`
   son ambos nullable, sin más constraints — no hay forma de "corromper"
   estos dos campos de texto libre.
+- `cadenas.nombre` único (normalizado). `tiendas.cadena_id`/`ubicacion` son
+  ambos nullable; la única regla entre ellos es el único parcial
+  `(cadena_id, ubicacion)` de arriba — no hay constraint que exija
+  `ubicacion` cuando hay `cadena_id` (una cadena de sucursal única no
+  necesita distinguirse por ubicación).
 
 ## Tipos TypeScript
 
@@ -519,10 +657,19 @@ fuera del alcance de esta migración de base de datos.
 `profiles` (migraciones 13-14, sección siguiente) **no necesitó ningún
 cambio en `app/`**: es puramente aditiva (tabla nueva, sin tocar columnas ni
 policies de tablas existentes), verificado igual con `tsc --noEmit` sobre
-todo el proyecto (0 errores). Mostrar esos nombres en
-`/ajustes/hogar` en vez de `Miembro {uuid corto}` sigue siendo trabajo de
-frontend pendiente (reemplazar ese `select(... user_id ...)` por un join o
-una segunda query a `profiles`), fuera del alcance de esta migración.
+todo el proyecto (0 errores). *(Actualización: `/ajustes/hogar` ya muestra
+`nombre_completo` con fallback al rol — ver el historial de git — así que
+esa pieza de frontend, pendiente cuando se escribió este párrafo, ya se
+hizo.)*
+
+`cadenas`/`tiendas.cadena_id`/`tiendas.ubicacion` (migraciones 15-17,
+sección "Cadenas de supermercado" más arriba) **tampoco necesitaron ningún
+cambio en `app/`**: el flujo de alta de tiendas existente
+(`getOrCreateTienda`) no toca `cadena_id`, así que sigue de-duplicando por
+nombre exactamente igual que antes (verificado con `tsc --noEmit` limpio).
+Nada en `app/` arma todavía UI para elegir cadena/ubicación al cargar una
+tienda ni para comparar precios por cadena — es trabajo de frontend
+pendiente, fuera del alcance de esta migración.
 
 ## Pruebas realizadas (3 usuarios, 2 hogares)
 
@@ -578,6 +725,57 @@ simulando sesiones con `set role authenticated` + `set request.jwt.claims`):
    desaparece (`on delete cascade`), confirmando que no queda huérfano.
 9. `anon` sin ningún grant sobre `profiles`.
 
+### Cadenas de supermercado
+
+Corrido contra la base local con las 6 cadenas ya sembradas:
+
+1. `select count(*) from cadenas` = 6 tras el `db reset`; se vuelve a
+   correr el `INSERT ... ON CONFLICT DO NOTHING` a mano sobre 2 de los 6
+   nombres ya existentes → sigue en 6 (idempotente).
+2. Dos `insert` en `tiendas` con `nombre = 'Walmart'`, mismo `cadena_id`,
+   `ubicacion` `'Fraijanes'` y `'Miraflores'` respectivamente → **ambos
+   funcionan** (el índice único viejo por nombre ya no lo bloquea).
+3. Un tercer `insert` repitiendo `cadena_id` + `ubicacion = 'Fraijanes'` →
+   **falla** (`tiendas_cadena_ubicacion_unique_idx`, sucursal duplicada).
+4. `insert` de dos tiendas SIN `cadena_id`, incluida una con el mismo nombre
+   normalizado que otra ya existente (`'tienda don pepe '` vs.
+   `'Tienda Don Pepe'`) → la segunda **falla** (`tiendas_nombre_unique_idx`,
+   comportamiento preexistente intacto). Una tienda sin cadena de nombre
+   distinto (`'Abarrotería La Esquina'`) se inserta sin problema.
+5. `vista_precio_unitario` sobre una compra en la sucursal de Fraijanes
+   muestra `cadena_nombre = 'Walmart'`; sobre una compra en la tienda de
+   barrio (sin cadena) muestra `cadena_nombre = null` — el `LEFT JOIN`
+   funciona como se espera en ambos casos.
+6. Un usuario intenta `UPDATE` sobre la cadena sembrada "Walmart" → afecta 0
+   filas (`created_by` de las filas sembradas es `null`, ver la nota en
+   "Cadenas de supermercado" más arriba). El mismo usuario **sí** puede
+   crear una cadena propia y editarla después (`created_by = auth.uid()`).
+7. `anon` sin ningún grant sobre `cadenas`.
+
+### Columna `nombre` vs. `codigo_invitacion` en `hogares` (owner/member)
+
+Corrido con un owner y un member en el mismo hogar:
+
+1. Owner cambia `nombre` con un `UPDATE` directo → funciona.
+2. Owner intenta `UPDATE codigo_invitacion` directo → falla, `permission
+   denied for table hogares` (sin GRANT en esa columna, ni llega a evaluar
+   RLS).
+3. Owner intenta un único `UPDATE` que cambia `nombre` **y**
+   `codigo_invitacion` a la vez → falla completo (ninguna de las dos
+   columnas cambia): el GRANT por columna bloquea el statement entero, no
+   columna por columna.
+4. Owner llama `regenerar_codigo_hogar()` → sigue funcionando, código
+   cambia.
+5. Member (no owner) intenta cambiar `nombre` → afecta 0 filas (RLS).
+   Member llama `regenerar_codigo_hogar()` → falla limpio (errcode 42501).
+6. Un tercer usuario que ni siquiera es miembro del hogar llama
+   `regenerar_codigo_hogar()` con ese `hogar_id` → falla igual que el
+   member, confirmando que pasar la función a `SECURITY DEFINER` no abrió
+   ningún agujero de autorización.
+7. `nombre` vacío/solo espacios sigue rechazado por
+   `hogares_nombre_not_blank` (el GRANT por columna no reemplaza los CHECK
+   constraints). `anon` sigue sin ningún acceso a `hogares`.
+
 ## Decisiones a revisar más adelante (no bloqueantes)
 
 - **Un usuario puede terminar en más de un hogar** (el propio, auto-creado
@@ -618,12 +816,27 @@ simulando sesiones con `set role authenticated` + `set request.jwt.claims`):
   bucket de Supabase Storage ni sus policies. Si se implementa upload de
   avatar, hace falta eso aparte (bucket + policies de storage), y
   `avatar_url` seguiría siendo simplemente la URL pública resultante.
-- `profiles` no tiene UI todavía: `/ajustes/hogar` sigue mostrando
-  `Miembro {uuid corto}` en vez de `nombre_completo` (ver "Cambios en app/"
-  más arriba) — es la pieza de frontend que falta para que esta migración
-  se note en pantalla.
+- ~~`profiles` no tiene UI todavía~~ — ya resuelto, `/ajustes/hogar` muestra
+  `nombre_completo` con fallback al rol.
 - `comparte_hogar_con` recorre TODOS los hogares en común entre dos
   usuarios (no distingue "hogar activo"); si más adelante existe ese
   concepto (ver el primer punto de esta lista), probablemente convenga que
   la visibilidad de `profiles` siga el mismo criterio en vez de "cualquier
   hogar en común, sea cual sea".
+- **`cadenas` no tiene UI todavía**: nada en `app/` deja elegir cadena +
+  ubicación al dar de alta una tienda (`getOrCreateTienda` sigue creando
+  tiendas sin `cadena_id`), ni hay pantalla que use la comparación por
+  cadena de `vista_precio_unitario`. Es trabajo de frontend pendiente, fuera
+  del alcance de esta migración.
+- **`tiendas.ubicacion` es texto libre**, no una FK a una tabla de
+  ubicaciones/ciudades normalizada. Es intencional (mismo criterio que
+  `presentaciones.unidad`: flexible, sin catálogo que mantener) pero implica
+  que "Fraijanes" y "fraijanes " serían dos ubicaciones distintas a efectos
+  del único `(cadena_id, ubicacion)` — no hay normalización como la que sí
+  tiene `nombre` en `tiendas`/`productos`/`cadenas`. Si en la práctica
+  aparecen duplicados por esto, la solución es la misma que ya se usa en
+  otro lado: un índice único sobre `(cadena_id, lower(btrim(ubicacion)))`.
+- El catálogo de `cadenas` no es exhaustivo ni tiene moderación (mismo punto
+  que el de arriba sobre tiendas/productos): cualquier `authenticated` puede
+  agregar una cadena nueva, y las 6 sembradas son un punto de partida, no
+  una lista cerrada.

@@ -6,10 +6,13 @@ import type { ActionState } from "@/lib/types";
 
 /**
  * Regenera el código de invitación del hogar. `regenerar_codigo_hogar` (ver
- * supabase/migrations/20260823160000_hogares.sql) es `SECURITY INVOKER`: se
- * apoya en la policy de UPDATE de `hogares` (solo `owner`) para autorizar, así
- * que si quien llama no es owner el RPC directamente falla (errcode 42501) —
- * no hace falta revalidar el rol acá antes de llamar.
+ * supabase/migrations/20260824090000_hogares_nombre_update_column_grant.sql)
+ * es `SECURITY DEFINER` y valida "es owner" ella misma (`es_owner_de_hogar`):
+ * desde esa migración, `authenticated` ya no tiene GRANT UPDATE sobre
+ * `hogares.codigo_invitacion` (solo sobre `nombre`), así que ya no puede
+ * apoyarse en la policy de RLS de `hogares` para autorizar ese campo. Si
+ * quien llama no es owner, el RPC directamente falla (errcode 42501) — no
+ * hace falta revalidar el rol acá antes de llamar.
  */
 export async function regenerarCodigoHogar(
   _prevState: ActionState,
