@@ -32,6 +32,18 @@ export default async function AjustesHogarPage() {
   const soyOwner =
     miembros?.some((m) => m.user_id === user.id && m.rol === "owner") ?? false;
 
+  // profiles: RLS (comparte_hogar_con) ya limita esto a "el propio + quien
+  // comparta un hogar conmigo" (ver supabase/README.md, sección "Profiles"),
+  // así que no hace falta filtrar de nuevo acá — el .in solo evita traer de
+  // más si el usuario está en otros hogares además de este.
+  const userIds = (miembros ?? []).map((m) => m.user_id);
+  const { data: profiles } = userIds.length
+    ? await supabase.from("profiles").select("id, nombre_completo").in("id", userIds)
+    : { data: [] };
+  const nombresPorUsuario = new Map(
+    (profiles ?? []).map((p) => [p.id, p.nombre_completo])
+  );
+
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-6 pb-6">
       <div className="flex items-center gap-2">
@@ -59,6 +71,8 @@ export default async function AjustesHogarPage() {
         <ul className="flex flex-col gap-2">
           {(miembros ?? []).map((miembro) => {
             const esVos = miembro.user_id === user.id;
+            const rolFallback = miembro.rol === "owner" ? "Dueño" : "Miembro";
+            const nombre = nombresPorUsuario.get(miembro.user_id) || rolFallback;
             return (
               <li
                 key={miembro.id}
@@ -70,7 +84,8 @@ export default async function AjustesHogarPage() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                    {esVos ? `Vos (${user.email})` : `Miembro ${miembro.user_id.slice(0, 8)}`}
+                    {nombre}
+                    {esVos ? " (vos)" : ""}
                   </p>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
                     Desde {formatDate(miembro.joined_at.slice(0, 10))}
@@ -89,10 +104,6 @@ export default async function AjustesHogarPage() {
             );
           })}
         </ul>
-        <p className="px-1 text-xs text-zinc-400 dark:text-zinc-500">
-          Alacena todavía no guarda nombres ni emails de otros integrantes del
-          hogar, solo su rol.
-        </p>
       </section>
     </div>
   );
