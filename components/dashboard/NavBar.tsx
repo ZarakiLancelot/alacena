@@ -8,6 +8,7 @@ const LINKS = [
   { href: "/inventario", label: "Inventario", icon: "📦" },
   { href: "/compras", label: "Nueva compra", icon: "🧾" },
   { href: "/historial", label: "Historial", icon: "📊" },
+  { href: "/ajustes", label: "Ajustes", icon: "⚙️" },
 ] as const;
 
 export function NavBar() {

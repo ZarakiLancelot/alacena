@@ -1,8 +1,26 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// Rutas públicas: no requieren sesión. Todo lo demás se trata como protegido.
-const PUBLIC_PATHS = ["/login", "/signup"];
+// Páginas de autenticación: no requieren sesión, y si el usuario YA está logueado
+// se lo saca de ahí (ver el segundo `if` de abajo) — no tiene sentido ver /login
+// con sesión activa.
+const AUTH_PATHS = ["/login", "/signup"];
+
+// Rutas públicas que NO son de auth: no requieren sesión, pero tampoco hay que
+// redirigir a un usuario logueado que las pida (a diferencia de /login).
+const PUBLIC_PATHS = ["/offline", "/manifest.webmanifest"];
+
+// Prefijos públicos (rutas dinámicas/anidadas, no un pathname exacto):
+// - /serwist/ — el service worker (sw.js/sw.js.map) tiene que poder registrarse
+//   ANTES de que haya sesión (ej. mientras se muestra /login); si el proxy lo
+//   redirige a /login, el navegador "instala" esa respuesta HTML como service
+//   worker y rompe el registro.
+// - /api/cron/ — lo llama un cron externo (Vercel Cron u otro) sin cookie de
+//   sesión de Supabase; se autentica solo con el header
+//   `Authorization: Bearer $CRON_SECRET` dentro de la propia Route Handler (ver
+//   app/api/cron/vencimientos/route.ts). Si esto no fuera público, el proxy lo
+//   redirigiría (307) a /login antes de que el handler llegue a validar nada.
+const PUBLIC_PREFIXES = ["/serwist/", "/api/cron/"];
 
 /**
  * Refresca la sesión de Supabase en cada request y protege las rutas
@@ -42,7 +60,11 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  const isPublicPath = PUBLIC_PATHS.includes(pathname);
+  const isAuthPath = AUTH_PATHS.includes(pathname);
+  const isPublicPath =
+    isAuthPath ||
+    PUBLIC_PATHS.includes(pathname) ||
+    PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone();
@@ -51,7 +73,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && (isPublicPath || pathname === "/")) {
+  if (user && (isAuthPath || pathname === "/")) {
     const url = request.nextUrl.clone();
     url.pathname = "/inventario";
     url.search = "";

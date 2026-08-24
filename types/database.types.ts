@@ -65,6 +65,7 @@ export type Database = {
       }
       compras: {
         Row: {
+          alerta_enviada_at: string | null
           cantidad: number
           consumido: boolean
           created_at: string
@@ -79,6 +80,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          alerta_enviada_at?: string | null
           cantidad?: number
           consumido?: boolean
           created_at?: string
@@ -93,6 +95,7 @@ export type Database = {
           user_id?: string
         }
         Update: {
+          alerta_enviada_at?: string | null
           cantidad?: number
           consumido?: boolean
           created_at?: string
@@ -220,6 +223,33 @@ export type Database = {
         }
         Relationships: []
       }
+      push_subscriptions: {
+        Row: {
+          created_at: string
+          endpoint: string
+          id: string
+          keys: Json
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          endpoint: string
+          id?: string
+          keys: Json
+          user_agent?: string | null
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          endpoint?: string
+          id?: string
+          keys?: Json
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       tiendas: {
         Row: {
           created_at: string
@@ -245,6 +275,7 @@ export type Database = {
     Views: {
       vista_alertas_vencimiento: {
         Row: {
+          alerta_enviada_at: string | null
           compra_id: string | null
           dias_antes: number | null
           dias_para_vencer: number | null

@@ -20,6 +20,13 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## PWA y notificaciones push
+
+Alacena es instalable (Serwist + Web App Manifest) y manda notificaciones push
+de vencimiento. Ver [`docs/pwa-push.md`](./docs/pwa-push.md) para cómo generar
+las claves VAPID, probar el push en local y las limitaciones de iOS Safari.
+Schema de base de datos: [`supabase/README.md`](./supabase/README.md).
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

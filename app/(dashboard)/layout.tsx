@@ -1,5 +1,6 @@
 import { NavBar } from "@/components/dashboard/NavBar";
 import { LogoutButton } from "@/components/dashboard/LogoutButton";
+import { AlertasBanner } from "@/components/push/AlertasBanner";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function DashboardLayout({
@@ -27,6 +28,8 @@ export default async function DashboardLayout({
           <LogoutButton />
         </div>
       </header>
+
+      <AlertasBanner />
 
       <main className="flex-1 overflow-y-auto px-4 py-4">{children}</main>
 

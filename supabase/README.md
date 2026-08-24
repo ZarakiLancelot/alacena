@@ -111,6 +111,12 @@ En `supabase/migrations/`, en orden de aplicación:
 6. `20260823140500_vistas_precio_y_stock.sql` — función
    `calcular_precio_unitario` y las vistas `vista_precio_unitario`,
    `vista_stock_actual`, `vista_alertas_vencimiento`.
+7. `20260823150000_push_subscriptions.sql` — tabla `push_subscriptions`
+   (endpoint + keys de Web Push por usuario/dispositivo), RLS, grants. Ver
+   `docs/pwa-push.md`.
+8. `20260823150100_compras_alerta_enviada.sql` — agrega
+   `compras.alerta_enviada_at` (dedup del cron de push) y actualiza
+   `vista_alertas_vencimiento` para exponerla.
 
 ### Nota sobre GRANTs (importante en este proyecto)
 
@@ -132,6 +138,7 @@ localmente: `anon` obtiene `permission denied` en las 5 tablas.
 | `presentaciones` | cualquier `authenticated` | `authenticated`, `created_by = auth.uid()` | solo el creador | solo el creador |
 | `compras` | solo dueño (`user_id = auth.uid()`) | dueño | dueño | dueño |
 | `alertas_config` | solo dueño | dueño | dueño | dueño |
+| `push_subscriptions` | solo dueño | dueño | dueño | dueño |
 
 `user_id` y `created_by` tienen `default auth.uid()`, así el cliente
 (`supabase-js`) no necesita enviarlos explícitamente al hacer `insert()`; el
