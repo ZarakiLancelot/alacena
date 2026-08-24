@@ -99,7 +99,7 @@ export default async function AnalyticsPage({
         <input type="hidden" name="periodo" value={periodo} />
         <button
           type="submit"
-          className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium dark:border-zinc-700"
+          className="cursor-pointer rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium dark:border-zinc-700"
         >
           Ver producto
         </button>
@@ -157,8 +157,8 @@ export default async function AnalyticsPage({
                 value={p}
                 className={
                   p === periodo
-                    ? "rounded-full bg-emerald-600 px-3 py-1 font-medium text-white"
-                    : "rounded-full border border-zinc-300 px-3 py-1 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300"
+                    ? "cursor-pointer rounded-full bg-emerald-600 px-3 py-1 font-medium text-white"
+                    : "cursor-pointer rounded-full border border-zinc-300 px-3 py-1 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300"
                 }
               >
                 {p === "semana" ? "Esta semana" : "Este mes"}

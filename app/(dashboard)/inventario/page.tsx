@@ -92,7 +92,7 @@ export default async function InventarioPage({
           </select>
           <button
             type="submit"
-            className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium dark:border-zinc-700"
+            className="cursor-pointer rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium dark:border-zinc-700"
           >
             Filtrar
           </button>
@@ -134,9 +134,9 @@ export default async function InventarioPage({
                 <form action={consumirCompra.bind(null, compra.id)}>
                   <SubmitButton
                     pendingLabel="…"
-                    className="w-auto whitespace-nowrap bg-zinc-800 px-3 py-2 text-sm dark:bg-zinc-100 dark:text-zinc-900"
+                    className="w-auto whitespace-nowrap bg-sky-600 px-3 py-2 text-sm active:bg-sky-700 dark:bg-sky-500 dark:active:bg-sky-600"
                   >
-                    Consumir
+                    Ya no tengo
                   </SubmitButton>
                 </form>
               </li>

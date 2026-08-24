@@ -66,7 +66,7 @@ export default async function HistorialPage({
         <div className="flex gap-2">
           <button
             type="submit"
-            className="flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium dark:border-zinc-700"
+            className="flex-1 cursor-pointer rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium dark:border-zinc-700"
           >
             Filtrar
           </button>

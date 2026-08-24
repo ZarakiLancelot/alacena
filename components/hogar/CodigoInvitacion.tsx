@@ -52,7 +52,7 @@ export function CodigoInvitacion({
         <button
           type="button"
           onClick={copiar}
-          className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-zinc-300 px-3 py-2.5
+          className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-zinc-300 px-3 py-2.5
             text-sm font-medium text-zinc-700 dark:border-zinc-700 dark:text-zinc-300"
         >
           {copiado ? (
@@ -68,7 +68,7 @@ export function CodigoInvitacion({
         <button
           type="button"
           onClick={compartir}
-          className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 py-2.5
+          className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 py-2.5
             text-sm font-medium text-white"
         >
           <FiShare2 className="h-4 w-4" aria-hidden /> Compartir
