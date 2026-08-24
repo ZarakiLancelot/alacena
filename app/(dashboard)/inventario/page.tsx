@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ExpiryBadge } from "@/components/inventario/ExpiryBadge";
 import { SubmitButton } from "@/components/SubmitButton";
 import { consumirCompra } from "@/app/(dashboard)/inventario/actions";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatTiendaNombre } from "@/lib/utils";
 
 type CompraPendiente = {
   id: string;
@@ -20,7 +20,7 @@ type CompraPendiente = {
       marca: string | null;
     } | null;
   } | null;
-  tiendas: { nombre: string } | null;
+  tiendas: { nombre: string; ubicacion: string | null } | null;
 };
 
 export default async function InventarioPage({
@@ -41,7 +41,7 @@ export default async function InventarioPage({
       supabase
         .from("compras")
         .select(
-          "id, cantidad, fecha_compra, fecha_vencimiento, presentaciones(tamaño, unidad, productos(id, nombre, categoria, marca)), tiendas(nombre)"
+          "id, cantidad, fecha_compra, fecha_vencimiento, presentaciones(tamaño, unidad, productos(id, nombre, categoria, marca)), tiendas(nombre, ubicacion)"
         )
         .eq("consumido", false)
         .order("fecha_vencimiento", { ascending: true, nullsFirst: false }),
@@ -119,7 +119,8 @@ export default async function InventarioPage({
                   <p className="text-sm text-zinc-500 dark:text-zinc-400">
                     {compra.presentaciones?.tamaño} {compra.presentaciones?.unidad} ·
                     {" "}
-                    {compra.cantidad} u. · {compra.tiendas?.nombre}
+                    {compra.cantidad} u. ·{" "}
+                    {formatTiendaNombre(compra.tiendas?.nombre, compra.tiendas?.ubicacion)}
                   </p>
                   <p className="text-sm text-zinc-500 dark:text-zinc-400">
                     Comprado {formatDate(compra.fecha_compra)}

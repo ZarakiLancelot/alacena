@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getHogarIdActual } from "@/lib/supabase/hogar";
 import { CodigoInvitacion } from "@/components/hogar/CodigoInvitacion";
 import { RegenerarCodigoForm } from "@/components/hogar/RegenerarCodigoForm";
+import { EditarNombreHogarForm } from "@/components/hogar/EditarNombreHogarForm";
 import { formatDate } from "@/lib/utils";
 
 export default async function AjustesHogarPage() {
@@ -56,9 +57,13 @@ export default async function AjustesHogarPage() {
         </Link>
       </div>
 
-      <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-        {hogar.nombre}
-      </h1>
+      {soyOwner ? (
+        <EditarNombreHogarForm hogarId={hogar.id} nombreActual={hogar.nombre} />
+      ) : (
+        <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+          {hogar.nombre}
+        </h1>
+      )}
 
       <CodigoInvitacion codigo={hogar.codigo_invitacion} hogarNombre={hogar.nombre} />
 

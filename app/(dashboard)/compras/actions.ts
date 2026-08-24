@@ -49,7 +49,12 @@ export async function crearCompra(
     const tiendaId =
       "id" in tiendaSel
         ? tiendaSel.id
-        : await getOrCreateTienda(supabase, tiendaSel.nombre);
+        : await getOrCreateTienda(
+            supabase,
+            tiendaSel.nombre,
+            data.tienda_cadena_id,
+            data.tienda_ubicacion
+          );
 
     const productoId =
       "id" in productoSel

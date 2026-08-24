@@ -44,6 +44,21 @@ function dateParts(value: string): [number, number, number] {
   return [y, m - 1, d];
 }
 
+/**
+ * "PriceSmart — Fraijanes" si la tienda tiene ubicación cargada, si no solo
+ * el nombre. Varias sucursales de una misma cadena pueden compartir nombre
+ * (ver supabase/migrations/20260823180000_cadenas.sql), así que en
+ * cualquier lugar donde se liste/compare por tienda conviene mostrar (y
+ * agrupar) por este combinado, no solo por `nombre`.
+ */
+export function formatTiendaNombre(
+  nombre: string | null | undefined,
+  ubicacion?: string | null
+): string {
+  if (!nombre) return "—";
+  return ubicacion ? `${nombre} — ${ubicacion}` : nombre;
+}
+
 export type ComboSelection =
   | { type: "existing"; id: string; label: string }
   | { type: "new"; label: string }

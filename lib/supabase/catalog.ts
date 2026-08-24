@@ -19,13 +19,17 @@ const UNIQUE_VIOLATION = "23505";
 
 export async function getOrCreateTienda(
   supabase: Client,
-  nombre: string
+  nombre: string,
+  cadenaId?: string | null,
+  ubicacion?: string | null
 ): Promise<string> {
   const trimmed = nombre.trim();
+  const cadenaIdValue = cadenaId || null;
+  const ubicacionValue = ubicacion?.trim() || null;
 
   const { data, error } = await supabase
     .from("tiendas")
-    .insert({ nombre: trimmed })
+    .insert({ nombre: trimmed, cadena_id: cadenaIdValue, ubicacion: ubicacionValue })
     .select("id")
     .single();
 
@@ -34,12 +38,17 @@ export async function getOrCreateTienda(
     throw new Error(`No se pudo crear la tienda "${trimmed}": ${error.message}`);
   }
 
-  const { data: existing, error: findError } = await supabase
-    .from("tiendas")
-    .select("id")
-    .ilike("nombre", trimmed)
-    .limit(1)
-    .maybeSingle();
+  // Dos índices únicos posibles (ver
+  // supabase/migrations/20260823180000_cadenas.sql): con cadena+ubicación,
+  // el conflicto es por esa combinación; sin cadena, sigue siendo por
+  // nombre (entre tiendas también sin cadena).
+  let query = supabase.from("tiendas").select("id");
+  query =
+    cadenaIdValue && ubicacionValue
+      ? query.eq("cadena_id", cadenaIdValue).ilike("ubicacion", ubicacionValue)
+      : query.ilike("nombre", trimmed).is("cadena_id", null);
+
+  const { data: existing, error: findError } = await query.limit(1).maybeSingle();
 
   if (findError || !existing) {
     throw new Error(`No se pudo crear ni encontrar la tienda "${trimmed}".`);

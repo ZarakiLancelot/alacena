@@ -1,5 +1,5 @@
 import type { Tables } from "@/types/database.types";
-import { today } from "@/lib/utils";
+import { formatTiendaNombre, today } from "@/lib/utils";
 
 /**
  * Todo lo de acá lee filas de `vista_precio_unitario` (ver
@@ -101,13 +101,17 @@ export function seriesPorTienda(
   const porTienda = new Map<string, PuntoPrecio[]>();
   for (const row of rows) {
     if (!row.tienda_nombre || !row.fecha_compra) continue;
-    const puntos = porTienda.get(row.tienda_nombre) ?? [];
+    // Distintas sucursales de una misma cadena pueden compartir `nombre`
+    // (ver supabase/migrations/20260823180000_cadenas.sql): agrupar por el
+    // combinado nombre+ubicación evita mezclarlas en una sola serie.
+    const clave = formatTiendaNombre(row.tienda_nombre, row.tienda_ubicacion);
+    const puntos = porTienda.get(clave) ?? [];
     puntos.push({
       fecha: row.fecha_compra,
       precio_normal: row.precio_normal,
       precio_oferta: row.precio_oferta,
     });
-    porTienda.set(row.tienda_nombre, puntos);
+    porTienda.set(clave, puntos);
   }
 
   return Array.from(porTienda, ([nombre, puntos]) => {
@@ -141,13 +145,15 @@ export function comparadorTiendas(
   const ultimaPorTienda = new Map<string, PrecioUnitarioRow>();
   for (const row of rows) {
     if (!row.tienda_nombre || !row.fecha_compra || row.precio_por_unidad == null) continue;
-    ultimaPorTienda.set(row.tienda_nombre, row);
+    // Mismo motivo que en seriesPorTienda: agrupar por nombre+ubicación, no
+    // solo por nombre.
+    ultimaPorTienda.set(formatTiendaNombre(row.tienda_nombre, row.tienda_ubicacion), row);
   }
 
-  return Array.from(ultimaPorTienda.values())
-    .map((row) => ({
-      nombre: row.tienda_nombre!,
-      color: colorDe(colorTienda, row.tienda_nombre),
+  return Array.from(ultimaPorTienda.entries())
+    .map(([nombre, row]) => ({
+      nombre,
+      color: colorDe(colorTienda, nombre),
       precioPorUnidad: row.precio_por_unidad!,
       fecha: row.fecha_compra!,
     }))
@@ -227,8 +233,8 @@ export function cambioDePrecio(rows: PrecioUnitarioRow[]): CambioPrecio {
     anterior: precioAnterior,
     deltaPct,
     fecha: actual.fecha_compra!,
-    tienda: actual.tienda_nombre ?? "—",
+    tienda: formatTiendaNombre(actual.tienda_nombre, actual.tienda_ubicacion),
     fechaAnterior: anterior.fecha_compra!,
-    tiendaAnterior: anterior.tienda_nombre ?? "—",
+    tiendaAnterior: formatTiendaNombre(anterior.tienda_nombre, anterior.tienda_ubicacion),
   };
 }

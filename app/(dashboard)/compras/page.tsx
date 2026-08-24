@@ -4,9 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 export default async function ComprasPage() {
   const supabase = await createClient();
 
-  const [{ data: tiendas }, { data: productos }, { data: presentaciones }] =
+  const [{ data: tiendas }, { data: productos }, { data: presentaciones }, { data: cadenas }] =
     await Promise.all([
-      supabase.from("tiendas").select("id, nombre").order("nombre"),
+      supabase.from("tiendas").select("id, nombre, ubicacion").order("nombre"),
       supabase
         .from("productos")
         .select("id, nombre, categoria, marca")
@@ -18,6 +18,7 @@ export default async function ComprasPage() {
         .from("presentaciones")
         .select('id, producto_id, tamano:"tamaño", unidad')
         .order("tamaño"),
+      supabase.from("cadenas").select("id, nombre").order("nombre"),
     ]);
 
   return (
@@ -29,6 +30,7 @@ export default async function ComprasPage() {
         tiendas={tiendas ?? []}
         productos={productos ?? []}
         presentaciones={presentaciones ?? []}
+        cadenas={cadenas ?? []}
       />
     </div>
   );

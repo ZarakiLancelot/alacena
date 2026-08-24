@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FiChevronRight, FiHome } from "react-icons/fi";
+import { FiChevronRight, FiHome, FiShoppingBag } from "react-icons/fi";
 import { createClient } from "@/lib/supabase/server";
 import { PushToggle } from "@/components/push/PushToggle";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -29,6 +29,20 @@ export default async function AjustesPage() {
         </span>
         <span className="flex-1 text-sm font-medium text-zinc-900 dark:text-zinc-50">
           Mi hogar
+        </span>
+        <FiChevronRight className="h-4 w-4 text-zinc-400" aria-hidden />
+      </Link>
+
+      <Link
+        href="/ajustes/tiendas"
+        className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4
+          dark:border-zinc-800 dark:bg-zinc-950"
+      >
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300">
+          <FiShoppingBag className="h-4 w-4" aria-hidden />
+        </span>
+        <span className="flex-1 text-sm font-medium text-zinc-900 dark:text-zinc-50">
+          Tiendas
         </span>
         <FiChevronRight className="h-4 w-4 text-zinc-400" aria-hidden />
       </Link>

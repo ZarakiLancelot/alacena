@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, formatTiendaNombre } from "@/lib/utils";
 
 export default async function HistorialPage({
   searchParams,
@@ -12,7 +12,7 @@ export default async function HistorialPage({
 
   const [{ data: productos }, { data: tiendas }] = await Promise.all([
     supabase.from("productos").select("id, nombre").order("nombre"),
-    supabase.from("tiendas").select("id, nombre").order("nombre"),
+    supabase.from("tiendas").select("id, nombre, ubicacion").order("nombre"),
   ]);
 
   let query = supabase
@@ -53,7 +53,7 @@ export default async function HistorialPage({
           <option value="">Todas las tiendas</option>
           {(tiendas ?? []).map((t) => (
             <option key={t.id} value={t.id}>
-              {t.nombre}
+              {formatTiendaNombre(t.nombre, t.ubicacion)}
             </option>
           ))}
         </select>
@@ -98,7 +98,7 @@ export default async function HistorialPage({
                     {h.producto_nombre}
                   </p>
                   <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                    {h.tamaño} {h.unidad} · {h.tienda_nombre}
+                    {h.tamaño} {h.unidad} · {formatTiendaNombre(h.tienda_nombre, h.tienda_ubicacion)}
                   </p>
                   <p className="text-sm text-zinc-500 dark:text-zinc-400">
                     {formatDate(h.fecha_compra)}

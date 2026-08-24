@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatTiendaNombre } from "@/lib/utils";
 import {
   cambioDePrecio,
   comparadorTiendas,
@@ -29,7 +29,7 @@ export default async function AnalyticsPage({
   const [{ data: productos }, { data: tiendas }, { data: productosCategorias }] =
     await Promise.all([
       supabase.from("productos").select("id, nombre").order("nombre"),
-      supabase.from("tiendas").select("nombre").order("nombre"),
+      supabase.from("tiendas").select("nombre, ubicacion").order("nombre"),
       supabase.from("productos").select("categoria").not("categoria", "is", null),
     ]);
 
@@ -58,19 +58,28 @@ export default async function AnalyticsPage({
       : Promise.resolve({ data: [] as PrecioUnitarioRow[] }),
     supabase
       .from("vista_precio_unitario")
-      .select("categoria, tienda_nombre, precio_pagado, fecha_compra")
+      .select("categoria, tienda_nombre, tienda_ubicacion, precio_pagado, fecha_compra")
       .gte("fecha_compra", inicio)
       .lte("fecha_compra", fin),
   ]);
 
   const historialProducto = historialProductoRaw ?? [];
-  const gastoRows = gastoRowsRaw ?? [];
+  // gastoPorCampo agrupa genéricamente por el campo "tienda_nombre" del row;
+  // se reemplaza acá por el nombre ya combinado con ubicación (en vez de
+  // tocar la función genérica) para que dos sucursales de una misma cadena
+  // no se mezclen en una sola barra.
+  const gastoRows = (gastoRowsRaw ?? []).map((row) => ({
+    ...row,
+    tienda_nombre: formatTiendaNombre(row.tienda_nombre, row.tienda_ubicacion),
+  }));
 
   // Colores fijos por nombre (mismo color en todo el dashboard), asignados
   // sobre el universo completo de tiendas/categorías del usuario — no solo
   // las que aparecen en la selección actual — para que no "salten" de color
   // al cambiar de producto o de período.
-  const colorTienda = mapaDeColores((tiendas ?? []).map((t) => t.nombre));
+  const colorTienda = mapaDeColores(
+    (tiendas ?? []).map((t) => formatTiendaNombre(t.nombre, t.ubicacion))
+  );
   const colorCategoria = mapaDeColores((productosCategorias ?? []).map((p) => p.categoria));
 
   const productoSeleccionado = (productos ?? []).find((p) => p.id === productoId);

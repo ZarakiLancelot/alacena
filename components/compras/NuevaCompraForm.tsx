@@ -7,11 +7,12 @@ import { PresentacionField, type Presentacion } from "@/components/compras/Prese
 import { DuplicadoBanner } from "@/components/compras/DuplicadoBanner";
 import { SubmitButton } from "@/components/SubmitButton";
 import { crearCompra } from "@/app/(dashboard)/compras/actions";
-import { resolveCombo, today } from "@/lib/utils";
+import { formatTiendaNombre, resolveCombo, today } from "@/lib/utils";
 import { initialActionState } from "@/lib/types";
 
 type Producto = { id: string; nombre: string; categoria: string | null; marca: string | null };
-type Tienda = { id: string; nombre: string };
+type Tienda = { id: string; nombre: string; ubicacion: string | null };
+type Cadena = { id: string; nombre: string };
 
 function FieldErrors({ errors }: { errors?: string[] }) {
   if (!errors?.length) return null;
@@ -30,10 +31,12 @@ export function NuevaCompraForm({
   tiendas,
   productos,
   presentaciones,
+  cadenas,
 }: {
   tiendas: Tienda[];
   productos: Producto[];
   presentaciones: Presentacion[];
+  cadenas: Cadena[];
 }) {
   const [state, formAction] = useActionState(crearCompra, initialActionState);
   const formRef = useRef<HTMLFormElement>(null);
@@ -43,7 +46,7 @@ export function NuevaCompraForm({
   const [fechaCompra, setFechaCompra] = useState(today());
 
   const tiendaItems = useMemo(
-    () => tiendas.map((t) => ({ id: t.id, label: t.nombre })),
+    () => tiendas.map((t) => ({ id: t.id, label: formatTiendaNombre(t.nombre, t.ubicacion) })),
     [tiendas]
   );
   const productoItems = useMemo(
@@ -96,6 +99,39 @@ export function NuevaCompraForm({
         required
       />
       <FieldErrors errors={state.fieldErrors?.tienda} />
+
+      {tiendaSelection.type === "new" ? (
+        <div className="grid grid-cols-2 gap-2 rounded-lg bg-zinc-100 p-3 dark:bg-zinc-900">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+              Cadena (opcional)
+            </label>
+            <select
+              name="tienda_cadena_id"
+              defaultValue=""
+              className="rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            >
+              <option value="">Sin cadena / tienda de barrio</option>
+              {cadenas.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+              Ubicación (opcional)
+            </label>
+            <input
+              name="tienda_ubicacion"
+              placeholder="Ej. Fraijanes"
+              maxLength={120}
+              className="rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            />
+          </div>
+        </div>
+      ) : null}
 
       <Combobox
         label="Producto"

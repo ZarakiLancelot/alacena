@@ -22,6 +22,11 @@ const dateString = z
 export const compraSchema = z
   .object({
     tienda: z.string().trim().min(1, "Elegí o creá una tienda"),
+    tienda_cadena_id: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
+    tienda_ubicacion: z.preprocess(
+      emptyToUndefined,
+      z.string().trim().max(120).optional()
+    ),
     producto: z.string().trim().min(1, "Elegí o creá un producto"),
     producto_categoria: z.preprocess(
       emptyToUndefined,

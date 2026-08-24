@@ -24,6 +24,11 @@ export default async function DashboardLayout({
     ? await supabase.from("hogares").select("nombre").eq("id", hogarId).maybeSingle()
     : { data: null };
 
+  const { data: profile } = user
+    ? await supabase.from("profiles").select("nombre_completo").eq("id", user.id).maybeSingle()
+    : { data: null };
+  const nombreMostrado = profile?.nombre_completo || user?.email;
+
   return (
     <div className="flex min-h-full flex-1 flex-col bg-zinc-50 dark:bg-black">
       <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
@@ -42,9 +47,9 @@ export default async function DashboardLayout({
           ) : null}
         </span>
         <div className="flex items-center gap-3">
-          {user?.email ? (
+          {nombreMostrado ? (
             <span className="hidden text-sm text-zinc-500 sm:inline dark:text-zinc-400">
-              {user.email}
+              {nombreMostrado}
             </span>
           ) : null}
           <LogoutButton />
