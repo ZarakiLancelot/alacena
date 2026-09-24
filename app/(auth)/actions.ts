@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { authSchema } from "@/lib/validations";
+import { getSiteUrl } from "@/lib/site-url";
 import type { ActionState } from "@/lib/types";
 
 export async function login(
@@ -43,7 +44,14 @@ export async function signup(
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.signUp(parsed.data);
+  const siteUrl = await getSiteUrl();
+  const { data, error } = await supabase.auth.signUp({
+    ...parsed.data,
+    // Sin esto, Supabase usa el "Site URL" configurado en su dashboard para
+    // el link del email de confirmación — que en proyectos creados/probados
+    // en local suele quedar en http://localhost:3000 (ver lib/site-url.ts).
+    options: siteUrl ? { emailRedirectTo: `${siteUrl}/login` } : undefined,
+  });
 
   if (error) {
     return { error: error.message };
